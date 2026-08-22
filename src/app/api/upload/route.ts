@@ -7,10 +7,8 @@ import { verifyToken } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
-
-    //get Cookie
+    // Get token from cookie
     const cookieStore = await cookies();
-
     const token = cookieStore.get("token")?.value;
 
     if (!token) {
@@ -23,7 +21,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    //verify token
+    // Verify token
     const decoded = verifyToken(token);
 
     if (!decoded) {
@@ -36,13 +34,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // This is the REAL user ID from PostgreSQL
     const userId = decoded.userId;
 
-    console.log("Authenticated user ID:", userId);
-
-
-    // Check if the user exists in the database
+    // Check user exists
     const user = await prisma.user.findUnique({
       where: {
         id: userId,
@@ -59,13 +53,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-
-    // Handle file upload
+    // Read multipart/form-data
     const formData = await req.formData();
 
-    const file = formData.get("file") as File | null;
+    const file = formData.get("file");
 
-    if (!file) {
+    if (!(file instanceof File)) {
       return NextResponse.json(
         {
           success: false,
@@ -75,35 +68,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-
-    // Convert the file to a buffer for Cloudinary upload
+    // Convert File → Buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-
-    //
+    // Upload to Cloudinary
     const cloudinaryResult = await new Promise<any>(
       (resolve, reject) => {
-        const uploadStream =
-          cloudinary.uploader.upload_stream(
-            {
-              folder: "google-drive-clone",
-              resource_type: "auto",
-            },
-            (error, result) => {
-              if (error) {
-                reject(error);
-              } else {
-                resolve(result);
-              }
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "google-drive-clone",
+            resource_type: "auto",
+          },
+          (error, result) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(result);
             }
-          );
+          }
+        );
 
         uploadStream.end(buffer);
       }
     );
 
-    // Save file metadata to the database
+    // Save metadata in PostgreSQL
     const savedFile = await prisma.file.create({
       data: {
         name: file.name,
@@ -113,14 +103,12 @@ export async function POST(req: NextRequest) {
         cloudinaryId: cloudinaryResult.public_id,
         cloudinaryUrl: cloudinaryResult.secure_url,
 
-        // REAL authenticated user's ID
-        userId: userId,
+        userId,
       },
     });
 
     return NextResponse.json({
       success: true,
-
       file: {
         id: savedFile.id,
         name: savedFile.name,
@@ -132,7 +120,6 @@ export async function POST(req: NextRequest) {
         createdAt: savedFile.createdAt,
       },
     });
-
   } catch (error) {
     console.error("Upload error:", error);
 
