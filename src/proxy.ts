@@ -15,8 +15,6 @@ export default function proxy(req: NextRequest) {
 
   const payload = verifyToken(token);
 
-
-
   if (!payload) {
     return NextResponse.json(
       { error: "Invalid or expired token." },
