@@ -15,25 +15,42 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  files     File[]
+  files   File[]
+  folders Folder[]
 }
 
 model File {
-  id            String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  name          String
-  size          BigInt
-  mimeType      String
+  name     String
+  size     BigInt
+  mimeType String
 
-  cloudinaryId  String   @unique
+  cloudinaryId  String @unique
   cloudinaryUrl String
 
-  userId        String
+  userId String
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user     User    @relation(fields: [userId], references: [id])
+  folder   Folder? @relation(fields: [folderId], references: [id])
+  folderId String?
 
   @@index([userId])
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner    User     @relation(fields: [ownerId], references: [id])
+  parent   Folder?  @relation("FolderChildren", fields: [parentId], references: [id])
+  children Folder[] @relation("FolderChildren")
+  files    File[]
 }

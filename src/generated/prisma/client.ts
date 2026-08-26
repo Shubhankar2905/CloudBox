@@ -51,3 +51,8 @@ export type User = Prisma.UserModel
  * 
  */
 export type File = Prisma.FileModel
+/**
+ * Model Folder
+ * 
+ */
+export type Folder = Prisma.FolderModel
