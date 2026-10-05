@@ -30,5 +30,7 @@ export const config = {
     "/api/folder/:path*",
     "/api/me/:path*",
     "/api/upload/:path*",
+    "/dashboard/:path*",
+
   ],
 };

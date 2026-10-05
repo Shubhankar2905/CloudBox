@@ -59,7 +59,7 @@ export function DashboardHeader({
           >
             <Avatar className="size-8 bg-[#dce9ff] text-[#246bfe]">
               <AvatarFallback className="bg-[#dce9ff] text-xs font-semibold text-[#246bfe]">
-                SM
+                {username.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <span className="hidden text-left md:block">

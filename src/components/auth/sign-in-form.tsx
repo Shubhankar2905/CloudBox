@@ -76,7 +76,7 @@ export function SignInForm() {
       console.log("Login successful:", data.user);
 
       // Login successful
-      window.location.href = "/uploader"; // Redirect to the dashboard or desired page
+      window.location.href = "/dashboard"; // Redirect to the dashboard or desired page
     } catch (error) {
       console.error("Login request failed:", error);
 

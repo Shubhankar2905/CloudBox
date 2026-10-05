@@ -1,16 +1,116 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { FolderGrid } from "@/components/dashboard/folder-grid";
-import { FileOverview } from "@/components/dashboard/file-overview";
 import { RecentFiles } from "@/components/dashboard/recent-files";
+
+type FileItem = {
+  id: string;
+  name: string;
+  size: string;
+  mimeType: string;
+  createdAt: string;
+};
 
 export function DashboardShell() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [username, setUsername] = useState("Loading...");
+  const [files, setFiles] = useState<FileItem[]>([]);
 
+  useEffect(() => {
+    async function fetchFiles() {
+      try {
+        const response = await fetch("/api/file");
+
+        if (!response.ok) {
+          console.error("Failed to fetch files");
+          return;
+        }
+
+        const data = await response.json();
+
+        console.log("Files from API:", data.files);
+
+        setFiles(data.files);
+      } catch (error) {
+        console.error("Failed to fetch files:", error);
+      }
+    }
+
+    fetchFiles();
+  }, []);
+
+  useEffect(() => {
+    async function fetchCurrentUser() {
+      try {
+        const response = await fetch("/api/me");
+
+        if (!response.ok) {
+          console.error("Failed to fetch user:", response.status);
+          return;
+        }
+
+        const data = await response.json();
+
+        console.log("Current user:", data);
+
+        if (data.user?.name) {
+          setUsername(data.user.name);
+        }
+      } catch (error) {
+        console.error("Failed to fetch current user:", error);
+      }
+    }
+
+    fetchCurrentUser();
+  }, []);
+  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Upload failed:", data.error);
+        return;
+      }
+
+      console.log("Upload successful:", data.file);
+
+      // Add uploaded file to the dashboard immediately
+      setFiles((currentFiles) => [
+        {
+          id: data.file.id,
+          name: data.file.name,
+          size: data.file.size,
+          mimeType: data.file.mimeType,
+          createdAt: data.file.createdAt,
+        },
+        ...currentFiles,
+      ]);
+    } catch (error) {
+      console.error("Upload error:", error);
+    } finally {
+      // Allows selecting the same file again
+      event.target.value = "";
+    }
+  }
   const normalizedQuery = searchQuery.trim().toLowerCase();
   return (
     <div className="min-h-screen bg-[#f7f8fa] text-[#1d2939]">
@@ -18,6 +118,7 @@ export function DashboardShell() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onMenuClick={() => setSidebarOpen(true)}
+        username={username}
       />
       <div className="flex">
         <DashboardSidebar
@@ -39,19 +140,19 @@ export function DashboardShell() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button className="rounded-lg border border-[#dfe4eb] bg-white px-4 py-2.5 text-sm font-medium text-[#344054] shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition hover:border-[#b9c4d3] hover:bg-[#fbfcfd]">
-                  + New
-                </button>
                 <label className="cursor-pointer rounded-lg bg-[#246bfe] px-4 py-2.5 text-sm font-medium text-white shadow-[0_5px_12px_rgba(36,107,254,0.2)] transition hover:bg-[#155eef]">
                   <span>Upload file</span>
-                  <input type="file" className="sr-only" />
+                  <input
+                    type="file"
+                    className="sr-only"
+                    onChange={handleFileUpload}
+                  />
                 </label>
               </div>
             </div>
 
             <FolderGrid query={normalizedQuery} />
-            <FileOverview />
-            <RecentFiles query={normalizedQuery} />
+            <RecentFiles query={normalizedQuery} files={files} />
           </div>
         </main>
       </div>

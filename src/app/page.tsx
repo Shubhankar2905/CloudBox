@@ -1,5 +1,5 @@
 import Image from "next/image";
 
 export default function Home() {
-  return <div>67</div>;
+  return <div>TO DO : MAKE A LANDING PAGE</div>;
 }

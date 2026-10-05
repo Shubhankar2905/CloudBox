@@ -64,7 +64,7 @@ export function SignUpForm() {
 
       console.log("Signup successful:", data);
 
-      window.location.href = "/uploader";
+      window.location.href = "/dashboard";
     } catch (error) {
       console.error("Signup failed:", error);
     } finally {
