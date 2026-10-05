@@ -26,8 +26,7 @@ model File {
   size     BigInt
   mimeType String
 
-  cloudinaryId  String @unique
-  cloudinaryUrl String
+  storageKey String @unique
 
   userId String
 

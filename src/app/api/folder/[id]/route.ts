@@ -51,7 +51,13 @@ export async function GET(
     }
 
     return NextResponse.json({
-      folder,
+      folder: {
+        ...folder,
+        files: folder.files.map((file) => ({
+          ...file,
+          size: file.size.toString(),
+        })),
+      },
     });
   } catch (error) {
     console.error("Get folder error:", error);

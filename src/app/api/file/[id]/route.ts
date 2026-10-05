@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
-import cloudinary from "@/lib/cloudinary";
+import { getS3Bucket, getS3Client } from "@/lib/s3";
 
 export async function GET(
   req: NextRequest,
@@ -125,7 +126,12 @@ export async function PATCH(
 
     // 7. Return updated file
     return NextResponse.json(
-      { file: updatedFile },
+      {
+        file: {
+          ...updatedFile,
+          size: updatedFile.size.toString(),
+        },
+      },
       { status: 200 }
     );
 
@@ -182,10 +188,13 @@ export async function DELETE(
       );
     }
 
-    // 5. Delete actual file from Cloudinary
-    await cloudinary.uploader.destroy(file.cloudinaryId, {
-      resource_type: "auto",
-    });
+    // 5. Delete the object from S3
+    await getS3Client().send(
+      new DeleteObjectCommand({
+        Bucket: getS3Bucket(),
+        Key: file.storageKey,
+      })
+    );
 
     // 6. Delete metadata from PostgreSQL
     await prisma.file.delete({
