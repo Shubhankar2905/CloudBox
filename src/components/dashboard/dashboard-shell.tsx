@@ -14,12 +14,22 @@ type FileItem = {
   createdAt: string;
 };
 
+type FolderItem = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+type FileCategory = "all" | "media" | "docs" | "images" | "others";
 export function DashboardShell() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [username, setUsername] = useState("Loading...");
   const [files, setFiles] = useState<FileItem[]>([]);
-
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [activeCategory, setActiveCategory] = useState<FileCategory>("all");
+  // for fetvching files from the API
   useEffect(() => {
     async function fetchFiles() {
       try {
@@ -42,7 +52,7 @@ export function DashboardShell() {
 
     fetchFiles();
   }, []);
-
+  // for fetching Initial of the user from the API
   useEffect(() => {
     async function fetchCurrentUser() {
       try {
@@ -67,6 +77,26 @@ export function DashboardShell() {
 
     fetchCurrentUser();
   }, []);
+
+  useEffect(() => {
+    async function fetchFolders() {
+      try {
+        const response = await fetch("/api/folder");
+        if (!response.ok) {
+          console.error("Failed to fetch folders");
+          return;
+        }
+        const data = await response.json();
+        console.log("Folders from API:", data.folders);
+        setFolders(data.folders);
+      } catch (error) {
+        console.error("Failed to fetch folders:", error);
+      }
+    }
+
+    fetchFolders();
+  }, []);
+
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -112,6 +142,74 @@ export function DashboardShell() {
     }
   }
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredFiles = files.filter((file) => {
+    if (activeCategory === "all") {
+      return true;
+    }
+
+    if (activeCategory === "images") {
+      return file.mimeType.startsWith("image/");
+    }
+
+    if (activeCategory === "media") {
+      return (
+        file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")
+      );
+    }
+
+    if (activeCategory === "docs") {
+      return (
+        file.mimeType === "application/pdf" ||
+        file.mimeType.includes("word") ||
+        file.mimeType.includes("document") ||
+        file.mimeType.includes("spreadsheet") ||
+        file.mimeType.startsWith("text/")
+      );
+    }
+
+    if (activeCategory === "others") {
+      const isImage = file.mimeType.startsWith("image/");
+
+      const isMedia =
+        file.mimeType.startsWith("video/") ||
+        file.mimeType.startsWith("audio/");
+
+      const isDocument =
+        file.mimeType === "application/pdf" ||
+        file.mimeType.includes("word") ||
+        file.mimeType.includes("document") ||
+        file.mimeType.includes("spreadsheet") ||
+        file.mimeType.startsWith("text/");
+
+      return !isImage && !isMedia && !isDocument;
+    }
+
+    return true;
+  });
+
+  const viewConfig = {
+    all: {
+      title: "My Files",
+      description: "Manage your files and folders",
+    },
+    images: {
+      title: "Images",
+      description: "All your images",
+    },
+    media: {
+      title: "Media",
+      description: "All your media files",
+    },
+    docs: {
+      title: "Docs",
+      description: "All your documents",
+    },
+    others: {
+      title: "Others",
+      description: "Other files",
+    },
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f8fa] text-[#1d2939]">
       <DashboardHeader
@@ -124,6 +222,8 @@ export function DashboardShell() {
         <DashboardSidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          activeCategory={activeCategory}
+          onCategoryChange={setActiveCategory}
         />
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">
@@ -133,10 +233,11 @@ export function DashboardShell() {
                   Workspace
                 </p>
                 <h1 className="text-[27px] font-semibold tracking-[-0.03em] text-[#182230]">
-                  My Files
+                  {viewConfig[activeCategory].title}
                 </h1>
+
                 <p className="mt-1 text-sm text-[#8793a6]">
-                  Manage your files and folders
+                  {viewConfig[activeCategory].description}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -151,8 +252,24 @@ export function DashboardShell() {
               </div>
             </div>
 
-            <FolderGrid query={normalizedQuery} />
-            <RecentFiles query={normalizedQuery} files={files} />
+            {activeCategory === "all" ? (
+              <>
+                <FolderGrid
+                  query={normalizedQuery}
+                  folders={folders}
+                  onFolderCreated={(newFolder) => {
+                    setFolders((currentFolders) => [
+                      newFolder,
+                      ...currentFolders,
+                    ]);
+                  }}
+                />
+
+                <RecentFiles query={normalizedQuery} files={filteredFiles} />
+              </>
+            ) : (
+              <RecentFiles query={normalizedQuery} files={filteredFiles} />
+            )}
           </div>
         </main>
       </div>
