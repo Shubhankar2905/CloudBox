@@ -31,6 +31,9 @@ type FolderGridProps = {
   currentFolderId: string | null;
   onNavigate: (folderId: string | null) => void;
   onFolderCreated: (folder: FolderItem) => void;
+  onRenameFolder: (folder: FolderItem) => void;
+  onDeleteFolder: (folder: FolderItem) => void;
+  showFolders?: boolean;
 };
 
 export function FolderGrid({
@@ -39,6 +42,9 @@ export function FolderGrid({
   currentFolderId,
   onNavigate,
   onFolderCreated,
+  onRenameFolder,
+  onDeleteFolder,
+  showFolders = true,
 }: FolderGridProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
@@ -103,17 +109,34 @@ export function FolderGrid({
       <section aria-labelledby="folders-heading" className="mb-9">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="folders-heading" className="text-[17px] font-semibold text-[#1d2939]">
+            <h2
+              id="folders-heading"
+              className="text-[17px] font-semibold text-[#1d2939]"
+            >
               {currentFolderId ? "Folder contents" : "My Folders"}
             </h2>
-            <nav aria-label="Folder path" className="mt-2 flex min-w-0 items-center gap-1 text-xs text-[#667085]">
-              <button type="button" onClick={() => onNavigate(null)} className="inline-flex items-center gap-1 hover:text-[#246bfe]">
+            <nav
+              aria-label="Folder path"
+              className="mt-2 flex min-w-0 items-center gap-1 text-xs text-[#667085]"
+            >
+              <button
+                type="button"
+                onClick={() => onNavigate(null)}
+                className="inline-flex items-center gap-1 hover:text-[#246bfe]"
+              >
                 <Home className="size-3.5" /> My Files
               </button>
               {breadcrumbs.map((folder) => (
-                <span key={folder.id} className="flex min-w-0 items-center gap-1">
+                <span
+                  key={folder.id}
+                  className="flex min-w-0 items-center gap-1"
+                >
                   <ChevronRight className="size-3.5 shrink-0 text-[#98a2b3]" />
-                  <button type="button" onClick={() => onNavigate(folder.id)} className="truncate hover:text-[#246bfe]">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate(folder.id)}
+                    className="truncate hover:text-[#246bfe]"
+                  >
                     {folder.name}
                   </button>
                 </span>
@@ -133,39 +156,72 @@ export function FolderGrid({
           </button>
         </div>
 
-        {visibleFolders.length > 0 ? (
+        {showFolders && visibleFolders.length > 0 ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(205px,1fr))] gap-3">
             {visibleFolders.map((folder) => (
-              <div key={folder.id} className="group flex h-[66px] items-center gap-3 rounded-lg border border-[#e4e8ee] bg-white px-3.5 transition hover:border-[#b8cdf7] hover:bg-[#fbfdff] hover:shadow-[0_4px_12px_rgba(25,65,125,0.06)]">
-                <button type="button" onClick={() => onNavigate(folder.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+              <div
+                key={folder.id}
+                className="group flex h-[66px] items-center gap-3 rounded-lg border border-[#e4e8ee] bg-white px-3.5 transition hover:border-[#b8cdf7] hover:bg-[#fbfdff] hover:shadow-[0_4px_12px_rgba(25,65,125,0.06)]"
+              >
+                <button
+                  type="button"
+                  onClick={() => onNavigate(folder.id)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
                   <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#edf4ff] text-[#246bfe]">
                     <Folder className="size-[18px] fill-[#cfe0ff]" />
                   </div>
-                  <span className="truncate text-sm font-medium text-[#344054]">{folder.name}</span>
+                  <span className="truncate text-sm font-medium text-[#344054]">
+                    {folder.name}
+                  </span>
                 </button>
                 <DropdownMenu>
-                  <DropdownMenuTrigger render={<button type="button" className="rounded-md p-1 text-[#98a2b3] opacity-0 transition hover:bg-[#f2f4f7] hover:text-[#475467] group-hover:opacity-100" aria-label={`Actions for ${folder.name}`} />}>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="rounded-md p-1 text-[#98a2b3] opacity-0 transition hover:bg-[#f2f4f7] hover:text-[#475467] group-hover:opacity-100"
+                        aria-label={`Actions for ${folder.name}`}
+                      />
+                    }
+                  >
                     <MoreHorizontal className="size-[18px]" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-32">
-                    <DropdownMenuItem onClick={() => onNavigate(folder.id)}>Open</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onNavigate(folder.id)}>
+                      Open
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRenameFolder(folder)}>
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => onDeleteFolder(folder)}
+                    >
+                      Delete
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             ))}
           </div>
-        ) : (
+        ) : showFolders ? (
           <p className="rounded-lg border border-dashed border-[#d7dee8] bg-white px-4 py-8 text-center text-sm text-[#98a2b3]">
             {query ? "No folders match your search." : "This folder is empty."}
           </p>
-        )}
+        ) : null}
       </section>
 
-      <Dialog open={isCreateOpen} onOpenChange={(open) => !open && closeCreateDialog()}>
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(open) => !open && closeCreateDialog()}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Create folder</DialogTitle>
-            <DialogDescription>Create a folder inside the current folder.</DialogDescription>
+            <DialogDescription>
+              Create a folder inside the current folder.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <input
@@ -176,7 +232,9 @@ export function FolderGrid({
                 setFolderName(event.target.value);
                 setError("");
               }}
-              onKeyDown={(event) => event.key === "Enter" && !creating && createFolder()}
+              onKeyDown={(event) =>
+                event.key === "Enter" && !creating && createFolder()
+              }
               placeholder="e.g. College Projects"
               maxLength={255}
               className="w-full rounded-lg border border-[#d0d5dd] px-3 py-2.5 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#246bfe] focus:ring-2 focus:ring-[#246bfe]/10"
@@ -184,8 +242,20 @@ export function FolderGrid({
             {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
           </div>
           <DialogFooter>
-            <button type="button" onClick={closeCreateDialog} disabled={creating} className="rounded-lg border border-[#d0d5dd] px-4 py-2 text-sm font-medium text-[#344054] disabled:opacity-50">Cancel</button>
-            <button type="button" onClick={createFolder} disabled={creating || !folderName.trim()} className="rounded-lg bg-[#246bfe] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            <button
+              type="button"
+              onClick={closeCreateDialog}
+              disabled={creating}
+              className="rounded-lg border border-[#d0d5dd] px-4 py-2 text-sm font-medium text-[#344054] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={createFolder}
+              disabled={creating || !folderName.trim()}
+              className="rounded-lg bg-[#246bfe] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
               {creating ? "Creating..." : "Create folder"}
             </button>
           </DialogFooter>

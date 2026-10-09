@@ -49,10 +49,7 @@ export async function GET(
       { expiresIn: 300 }
     );
 
-    return NextResponse.json({
-      url: downloadUrl,
-      expiresIn: 300,
-    });
+    return NextResponse.redirect(downloadUrl);
   } catch (error) {
     console.error("Download file error:", error);
 
