@@ -27,9 +27,11 @@ export async function GET(req: NextRequest) {
     //   { message: "Token is valid" },
     //   { status: 200 }
     // );
+    const folderId = new URL(req.url).searchParams.get("folderId");
     const files = await prisma.file.findMany({
       where: {
         userId: decoded.userId,
+        folderId: folderId || null,
       },
       orderBy: {
         createdAt: "desc",

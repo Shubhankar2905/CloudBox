@@ -113,6 +113,28 @@ export async function PATCH(
 
     // 5. Get data from request
     const body = await req.json();
+    const folderId =
+      body.folderId === null || body.folderId === undefined
+        ? null
+        : typeof body.folderId === "string" && body.folderId.trim()
+          ? body.folderId.trim()
+          : undefined;
+
+    if (folderId !== undefined) {
+      const destination = await prisma.folder.findFirst({
+        where: {
+          id: folderId,
+          ownerId: decoded.userId,
+        },
+      });
+
+      if (!destination) {
+        return NextResponse.json(
+          { message: "Destination folder not found" },
+          { status: 404 }
+        );
+      }
+    }
 
     // 6. Update only allowed fields
     const updatedFile = await prisma.file.update({
@@ -120,7 +142,8 @@ export async function PATCH(
         id,
       },
       data: {
-        name: body.name,
+        ...(typeof body.name === "string" ? { name: body.name } : {}),
+        ...(folderId !== undefined ? { folderId } : {}),
       },
     });
 

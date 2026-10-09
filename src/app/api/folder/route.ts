@@ -109,12 +109,13 @@ export async function GET(req: NextRequest) {
     // Get parentId from query string
     const { searchParams } = new URL(req.url); // this one is from the query string, not the body
     const parentId = searchParams.get("parentId");
+    const includeAll = searchParams.get("all") === "true";
 
     // Get folders
     const folders = await prisma.folder.findMany({
       where: {
         ownerId: userId,
-        parentId: parentId || null,
+        ...(includeAll ? {} : { parentId: parentId || null }),
       },
       orderBy: {
         createdAt: "desc",

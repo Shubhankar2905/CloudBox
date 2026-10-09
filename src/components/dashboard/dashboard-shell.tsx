@@ -3,24 +3,9 @@
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
-import { FolderGrid } from "@/components/dashboard/folder-grid";
-import { RecentFiles } from "@/components/dashboard/recent-files";
+import { FolderGrid, type FolderItem } from "@/components/dashboard/folder-grid";
+import { RecentFiles, type FileItem } from "@/components/dashboard/recent-files";
 
-type FileItem = {
-  id: string;
-  name: string;
-  size: string;
-  mimeType: string;
-  createdAt: string;
-};
-
-type FolderItem = {
-  id: string;
-  name: string;
-  parentId: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
 type FileCategory = "all" | "media" | "docs" | "images" | "others";
 export function DashboardShell() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,12 +13,14 @@ export function DashboardShell() {
   const [username, setUsername] = useState("Loading...");
   const [files, setFiles] = useState<FileItem[]>([]);
   const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<FileCategory>("all");
-  // for fetvching files from the API
   useEffect(() => {
     async function fetchFiles() {
       try {
-        const response = await fetch("/api/file");
+        const response = await fetch(
+          `/api/file?folderId=${encodeURIComponent(currentFolderId || "")}`,
+        );
 
         if (!response.ok) {
           console.error("Failed to fetch files");
@@ -51,7 +38,7 @@ export function DashboardShell() {
     }
 
     fetchFiles();
-  }, []);
+  }, [currentFolderId]);
   // for fetching Initial of the user from the API
   useEffect(() => {
     async function fetchCurrentUser() {
@@ -81,7 +68,7 @@ export function DashboardShell() {
   useEffect(() => {
     async function fetchFolders() {
       try {
-        const response = await fetch("/api/folder");
+        const response = await fetch("/api/folder?all=true");
         if (!response.ok) {
           console.error("Failed to fetch folders");
           return;
@@ -108,6 +95,9 @@ export function DashboardShell() {
       const formData = new FormData();
 
       formData.append("file", file);
+      if (currentFolderId) {
+        formData.append("folderId", currentFolderId);
+      }
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -131,6 +121,7 @@ export function DashboardShell() {
           size: data.file.size,
           mimeType: data.file.mimeType,
           createdAt: data.file.createdAt,
+          folderId: data.file.folderId,
         },
         ...currentFiles,
       ]);
@@ -257,6 +248,8 @@ export function DashboardShell() {
                 <FolderGrid
                   query={normalizedQuery}
                   folders={folders}
+                  currentFolderId={currentFolderId}
+                  onNavigate={setCurrentFolderId}
                   onFolderCreated={(newFolder) => {
                     setFolders((currentFolders) => [
                       newFolder,
@@ -265,10 +258,36 @@ export function DashboardShell() {
                   }}
                 />
 
-                <RecentFiles query={normalizedQuery} files={filteredFiles} />
+                <RecentFiles
+                  query={normalizedQuery}
+                  files={filteredFiles}
+                  folders={folders}
+                  onFileMoved={(fileId, folderId) => {
+                    setFiles((currentFiles) =>
+                      currentFiles
+                        .map((file) =>
+                          file.id === fileId ? { ...file, folderId } : file,
+                        )
+                        .filter((file) => file.folderId === currentFolderId),
+                    );
+                  }}
+                />
               </>
             ) : (
-              <RecentFiles query={normalizedQuery} files={filteredFiles} />
+              <RecentFiles
+                query={normalizedQuery}
+                files={filteredFiles}
+                folders={folders}
+                onFileMoved={(fileId, folderId) => {
+                  setFiles((currentFiles) =>
+                    currentFiles
+                      .map((file) =>
+                        file.id === fileId ? { ...file, folderId } : file,
+                      )
+                      .filter((file) => file.folderId === currentFolderId),
+                  );
+                }}
+              />
             )}
           </div>
         </main>
