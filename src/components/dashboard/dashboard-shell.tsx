@@ -23,8 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FolderOpen } from "lucide-react";
 import { toast } from "@/components/ui/toast";
+import { getFileCategory, type FileCategory } from "@/lib/file-category";
 
-type FileCategory = "all" | "media" | "docs" | "images" | "others";
 type RenameTarget =
   | { type: "file"; item: FileItem }
   | { type: "folder"; item: FolderItem };
@@ -52,11 +52,14 @@ export function DashboardShell() {
   const [previewTarget, setPreviewTarget] = useState<FileItem | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function fetchFiles() {
       setFilesLoading(true);
       try {
         const response = await fetch(
-          `/api/file?folderId=${encodeURIComponent(currentFolderId || "")}`,
+          `/api/file?category=${activeCategory}&folderId=${encodeURIComponent(activeCategory === "all" ? currentFolderId || "" : "")}`,
+          { signal: controller.signal },
         );
         if (!response.ok) {
           toast.add({
@@ -70,6 +73,7 @@ export function DashboardShell() {
         const data = await response.json();
         setFiles(data.files);
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         console.error("Failed to fetch files:", error);
         toast.add({
           id: "dashboard-load-files",
@@ -78,11 +82,13 @@ export function DashboardShell() {
           description: "Please try again.",
         });
       } finally {
-        setFilesLoading(false);
+        if (!controller.signal.aborted) setFilesLoading(false);
       }
     }
     fetchFiles();
-  }, [currentFolderId]);
+
+    return () => controller.abort();
+  }, [activeCategory, currentFolderId]);
 
   useEffect(() => {
     async function fetchCurrentUser() {
@@ -315,7 +321,7 @@ export function DashboardShell() {
           .map((item) =>
             item.id === moveTarget.id ? { ...item, folderId: moveDestination || null } : item,
           )
-          .filter((item) => item.folderId === currentFolderId),
+          .filter((item) => activeCategory !== "all" || item.folderId === currentFolderId),
       );
       setMoveTarget(null);
       toast.add({
@@ -338,20 +344,9 @@ export function DashboardShell() {
   }
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredFiles = files.filter((file) => {
-    if (activeCategory === "images") return file.mimeType.startsWith("image/");
-    if (activeCategory === "media") return file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/");
-    if (activeCategory === "docs") {
-      return file.mimeType === "application/pdf" || file.mimeType.includes("word") || file.mimeType.includes("document") || file.mimeType.includes("spreadsheet") || file.mimeType.startsWith("text/");
-    }
-    if (activeCategory === "others") {
-      const image = file.mimeType.startsWith("image/");
-      const media = file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/");
-      const document = file.mimeType === "application/pdf" || file.mimeType.includes("word") || file.mimeType.includes("document") || file.mimeType.includes("spreadsheet") || file.mimeType.startsWith("text/");
-      return !image && !media && !document;
-    }
-    return true;
-  });
+  const filteredFiles = files.filter((file) =>
+    activeCategory === "all" || getFileCategory(file.name, file.mimeType) === activeCategory,
+  );
   const currentFolders = activeCategory === "all"
     ? folders.filter((folder) => folder.parentId === currentFolderId && folder.name.toLowerCase().includes(normalizedQuery))
     : [];
@@ -384,7 +379,15 @@ export function DashboardShell() {
     <div className="min-h-screen bg-muted/30 text-foreground">
       <DashboardHeader searchQuery={searchQuery} onSearchChange={setSearchQuery} onMenuClick={() => setSidebarOpen(true)} username={username} />
       <div className="flex">
-        <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+        <DashboardSidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          activeCategory={activeCategory}
+          onCategoryChange={(category) => {
+            setActiveCategory(category);
+            setCurrentFolderId(null);
+          }}
+        />
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">
             <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -450,7 +453,7 @@ export function DashboardShell() {
                   setFiles((items) =>
                     items
                       .map((file) => file.id === fileId ? { ...file, folderId } : file)
-                      .filter((file) => file.folderId === currentFolderId),
+                      .filter((file) => activeCategory !== "all" || file.folderId === currentFolderId),
                   )
                 }
               />

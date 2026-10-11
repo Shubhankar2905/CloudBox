@@ -186,19 +186,21 @@ export function FolderGrid({
                   onClick={() => onNavigate(folder.id)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#edf4ff] text-[#246bfe]">
-                    <Folder className="size-[18px] fill-[#cfe0ff]" />
+                  <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Folder className="size-[18px] fill-primary/20" />
                   </div>
-                  <span className="truncate text-sm font-medium text-[#344054]">
+
+                  <span className="truncate text-sm font-medium text-foreground">
                     {folder.name}
                   </span>
                 </button>
+
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
                       <button
                         type="button"
-                        className="rounded-md p-1 text-[#98a2b3] opacity-0 transition hover:bg-[#f2f4f7] hover:text-[#475467] group-hover:opacity-100"
+                        className="rounded-md p-1 text-muted-foreground opacity-0 transition-colors hover:bg-accent hover:text-accent-foreground group-hover:opacity-100 focus-visible:opacity-100"
                         aria-label={`Actions for ${folder.name}`}
                       />
                     }

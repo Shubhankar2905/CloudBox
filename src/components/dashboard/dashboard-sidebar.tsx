@@ -39,13 +39,13 @@ export function DashboardSidebar({
     <>
       {open && (
         <button
-          className="fixed inset-0 z-40 bg-[#182230]/25 lg:hidden"
+          className="fixed inset-0 z-40 bg-background/25 lg:hidden"
           onClick={onClose}
           aria-label="Close navigation"
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[250px] flex-col border-r border-[#e8ebf0] bg-white px-4 pb-6 pt-[92px] transition-transform lg:sticky lg:top-0 lg:z-10 lg:h-[calc(100vh-74px)] lg:translate-x-0 lg:pt-7 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[250px] flex-col border-r bg-background px-4 pb-6 pt-[92px] transition-transform lg:sticky lg:top-0 lg:z-10 lg:h-[calc(100vh-74px)] lg:translate-x-0 lg:pt-7 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <Button
           variant="ghost"

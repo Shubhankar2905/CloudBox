@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
+import type { FileCategory } from "@/lib/file-category";
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,11 +28,61 @@ export async function GET(req: NextRequest) {
     //   { message: "Token is valid" },
     //   { status: 200 }
     // );
-    const folderId = new URL(req.url).searchParams.get("folderId");
+    const searchParams = new URL(req.url).searchParams;
+    const folderId = searchParams.get("folderId");
+    const requestedCategory = searchParams.get("category") || "all";
+    const categories: FileCategory[] = ["all", "media", "docs", "images", "others"];
+    const category = categories.includes(requestedCategory as FileCategory)
+      ? (requestedCategory as FileCategory)
+      : "all";
+
+    const categoryFilters = {
+      images: {
+        OR: [
+          { mimeType: { startsWith: "image/" } },
+          { name: { endsWith: ".jpg", mode: "insensitive" as const } },
+          { name: { endsWith: ".jpeg", mode: "insensitive" as const } },
+          { name: { endsWith: ".png", mode: "insensitive" as const } },
+          { name: { endsWith: ".gif", mode: "insensitive" as const } },
+          { name: { endsWith: ".webp", mode: "insensitive" as const } },
+          { name: { endsWith: ".svg", mode: "insensitive" as const } },
+          { name: { endsWith: ".bmp", mode: "insensitive" as const } },
+          { name: { endsWith: ".tif", mode: "insensitive" as const } },
+          { name: { endsWith: ".tiff", mode: "insensitive" as const } },
+          { name: { endsWith: ".heic", mode: "insensitive" as const } },
+          { name: { endsWith: ".avif", mode: "insensitive" as const } },
+        ],
+      },
+      media: {
+        OR: [
+          { mimeType: { startsWith: "video/" } },
+          { mimeType: { startsWith: "audio/" } },
+          ...["mp4", "mov", "avi", "mkv", "webm", "m4v", "wmv", "mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"]
+            .map((extension) => ({ name: { endsWith: `.${extension}`, mode: "insensitive" as const } })),
+        ],
+      },
+      docs: {
+        OR: [
+          { mimeType: "application/pdf" },
+          { mimeType: { startsWith: "text/" } },
+          { mimeType: { contains: "word" } },
+          { mimeType: { contains: "document" } },
+          { mimeType: { contains: "spreadsheet" } },
+          { mimeType: { contains: "presentation" } },
+          ...["pdf", "doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx", "txt", "rtf", "odt", "ods"]
+            .map((extension) => ({ name: { endsWith: `.${extension}`, mode: "insensitive" as const } })),
+        ],
+      },
+    };
+
     const files = await prisma.file.findMany({
       where: {
         userId: decoded.userId,
-        folderId: folderId || null,
+        ...(category === "all"
+          ? { folderId: folderId || null }
+          : category === "others"
+            ? { NOT: [categoryFilters.images, categoryFilters.media, categoryFilters.docs] }
+            : categoryFilters[category]),
       },
       orderBy: {
         createdAt: "desc",

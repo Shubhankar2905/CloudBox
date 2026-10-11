@@ -4,6 +4,7 @@ import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ModeToggle } from "@/components/ui/mode-toggle";
 
 type DashboardHeaderProps = {
   searchQuery: string;
@@ -19,7 +20,7 @@ export function DashboardHeader({
   username,
 }: DashboardHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#e8ebf0] bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
       <div className="flex h-[74px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-10">
         <div className="flex items-center gap-3">
           <Button
@@ -59,6 +60,7 @@ export function DashboardHeader({
             <Bell />
             <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-destructive ring-2 ring-background" />
           </Button>
+          <ModeToggle />
           <Button
             variant="ghost"
             className="h-auto gap-2 p-1.5"
