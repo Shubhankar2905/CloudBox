@@ -15,8 +15,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  files   File[]
-  folders Folder[]
+  files              File[]
+  folders            Folder[]
+  createdSharedLinks SharedLink[] @relation("SharedLinkCreator")
 }
 
 model File {
@@ -33,9 +34,10 @@ model File {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User    @relation(fields: [userId], references: [id])
-  folder   Folder? @relation(fields: [folderId], references: [id])
-  folderId String?
+  user        User         @relation(fields: [userId], references: [id])
+  folder      Folder?      @relation(fields: [folderId], references: [id])
+  folderId    String?
+  sharedLinks SharedLink[]
 
   @@index([userId])
 }
@@ -52,4 +54,22 @@ model Folder {
   parent   Folder?  @relation("FolderChildren", fields: [parentId], references: [id])
   children Folder[] @relation("FolderChildren")
   files    File[]
+}
+
+model SharedLink {
+  id            String    @id @default(cuid())
+  tokenHash     String    @unique
+  fileId        String
+  createdById   String
+  allowDownload Boolean   @default(true)
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation("SharedLinkCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([createdById])
 }

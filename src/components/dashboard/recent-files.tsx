@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "@/components/ui/toast";
 import {
   formatFileSize,
   formatModifiedDate,
@@ -39,6 +40,8 @@ type RecentFilesProps = {
   files: FileItem[];
   folders: FolderItem[];
   onFileMoved: (fileId: string, folderId: string | null) => void;
+  onShareFile: (file: FileItem) => void;
+  onPreviewFile: (file: FileItem) => void;
   onRenameFile: (file: FileItem) => void;
   onDeleteFile: (file: FileItem) => void;
   onNavigate: (folderId: string) => void;
@@ -51,6 +54,8 @@ export function RecentFiles({
   files,
   folders,
   onFileMoved,
+  onShareFile,
+  onPreviewFile,
   onRenameFile,
   onDeleteFile,
   onNavigate,
@@ -60,7 +65,6 @@ export function RecentFiles({
   const [movingFile, setMovingFile] = useState<FileItem | null>(null);
   const [destinationId, setDestinationId] = useState("");
   const [moving, setMoving] = useState(false);
-  const [moveError, setMoveError] = useState("");
   const filteredFiles = files.filter((file) =>
     `${file.name} ${file.mimeType}`.toLowerCase().includes(query),
   );
@@ -69,22 +73,38 @@ export function RecentFiles({
     if (!movingFile) return;
     try {
       setMoving(true);
-      setMoveError("");
       const response = await fetch(`/api/file/${movingFile.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folderId: destinationId || null }),
       });
+
       const data = await response.json();
       if (!response.ok) {
-        setMoveError(data.message || "Failed to move file");
+        toast.add({
+          id: "dashboard-move",
+          type: "error",
+          title: "Move failed",
+          description: data.message || "Please try again.",
+        });
         return;
       }
       onFileMoved(movingFile.id, destinationId || null);
       setMovingFile(null);
+      toast.add({
+        id: "dashboard-move",
+        type: "success",
+        title: "Moved successfully",
+        description: `${movingFile.name} was moved successfully.`,
+      });
     } catch (error) {
       console.error("Move file error:", error);
-      setMoveError("Something went wrong while moving the file.");
+      toast.add({
+        id: "dashboard-move",
+        type: "error",
+        title: "Move failed",
+        description: "Something went wrong while moving the file.",
+      });
     } finally {
       setMoving(false);
     }
@@ -111,87 +131,127 @@ export function RecentFiles({
         </div>
         {folders.length > 0 || filteredFiles.length > 0 ? (
           <>
-          {folders.map((folder) => (
-            <div key={folder.id} className="grid grid-cols-[minmax(220px,2fr)_1fr_1fr_1fr_0.7fr_40px] items-center border-b border-[#f0f2f5] px-5 py-3.5 text-sm hover:bg-[#fbfcfe]">
-              <button type="button" onClick={() => onNavigate(folder.id)} className="flex min-w-0 items-center gap-3 text-left">
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#edf4ff] text-[#246bfe]"><Folder className="size-4 fill-[#cfe0ff]" /></span>
-                <span className="truncate font-medium text-[#344054]">{folder.name}</span>
-              </button>
-              <span className="text-[#667085]">Folder</span><span className="text-[#667085]">—</span>
-              <span className="text-[#667085]">{folder.updatedAt ? formatModifiedDate(folder.updatedAt) : "—"}</span><span className="text-[#667085]">Me</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<button className="rounded-md p-1.5 text-[#98a2b3] hover:bg-[#f2f4f7]" aria-label={`Actions for ${folder.name}`} />}><MoreHorizontal className="size-[18px]" /></DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onNavigate(folder.id)}>Open</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onRenameFolder(folder)}>Rename</DropdownMenuItem>
-                  <DropdownMenuItem variant="destructive" onClick={() => onDeleteFolder(folder)}>Delete</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
-          {filteredFiles.map((file) => (
-            <div
-              key={file.id}
-              className="grid grid-cols-[minmax(220px,2fr)_1fr_1fr_1fr_0.7fr_40px] items-center border-b border-[#f0f2f5] px-5 py-3.5 text-sm last:border-0 hover:bg-[#fbfcfe]"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#f2f4f7] text-[#667085]">
-                  {(() => {
-                    const Icon = getFileIcon(file.mimeType);
-                    return <Icon className="size-4" strokeWidth={1.8} />;
-                  })()}
-                </div>
-                <span className="truncate font-medium text-[#344054]">
-                  {file.name}
-                </span>
-              </div>
-              <span className="text-[#667085]">
-                {getFileType(file.mimeType)}
-              </span>
-              <span className="text-[#667085]">{formatFileSize(file.size)}</span>
-              <span className="text-[#667085]">
-                {formatModifiedDate(file.createdAt)}
-              </span>
-              <span className="text-[#667085]">Me</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <button
-                      className="rounded-md p-1.5 text-[#98a2b3] hover:bg-[#f2f4f7] hover:text-[#475467]"
-                      aria-label={`Actions for ${file.name}`}
-                    />
-                  }
+            {folders.map((folder) => (
+              <div
+                key={folder.id}
+                className="grid grid-cols-[minmax(220px,2fr)_1fr_1fr_1fr_0.7fr_40px] items-center border-b border-[#f0f2f5] px-5 py-3.5 text-sm hover:bg-[#fbfcfe]"
+              >
+                <button
+                  type="button"
+                  onClick={() => onNavigate(folder.id)}
+                  className="flex min-w-0 items-center gap-3 text-left"
                 >
-                  <MoreHorizontal className="size-[18px]" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-36">
-                  <DropdownMenuItem
-                    render={<a href={`/api/file/${file.id}/download`} />}
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#edf4ff] text-[#246bfe]">
+                    <Folder className="size-4 fill-[#cfe0ff]" />
+                  </span>
+                  <span className="truncate font-medium text-[#344054]">
+                    {folder.name}
+                  </span>
+                </button>
+                <span className="text-[#667085]">Folder</span>
+                <span className="text-[#667085]">—</span>
+                <span className="text-[#667085]">
+                  {folder.updatedAt
+                    ? formatModifiedDate(folder.updatedAt)
+                    : "—"}
+                </span>
+                <span className="text-[#667085]">Me</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        className="rounded-md p-1.5 text-[#98a2b3] hover:bg-[#f2f4f7]"
+                        aria-label={`Actions for ${folder.name}`}
+                      />
+                    }
                   >
-                    Download
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setDestinationId(file.folderId || "");
-                      setMoveError("");
-                      setMovingFile(file);
-                    }}
+                    <MoreHorizontal className="size-[18px]" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onNavigate(folder.id)}>
+                      Open
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRenameFolder(folder)}>
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => onDeleteFolder(folder)}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+            {filteredFiles.map((file) => (
+              <div
+                key={file.id}
+                onDoubleClick={() => onPreviewFile(file)}
+                className="grid grid-cols-[minmax(220px,2fr)_1fr_1fr_1fr_0.7fr_40px] items-center border-b border-[#f0f2f5] px-5 py-3.5 text-sm last:border-0 hover:bg-[#fbfcfe]"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#f2f4f7] text-[#667085]">
+                    {(() => {
+                      const Icon = getFileIcon(file.mimeType);
+                      return <Icon className="size-4" strokeWidth={1.8} />;
+                    })()}
+                  </div>
+                  <span className="truncate font-medium text-[#344054]">
+                    {file.name}
+                  </span>
+                </div>
+                <span className="text-[#667085]">
+                  {getFileType(file.mimeType)}
+                </span>
+                <span className="text-[#667085]">
+                  {formatFileSize(file.size)}
+                </span>
+                <span className="text-[#667085]">
+                  {formatModifiedDate(file.createdAt)}
+                </span>
+                <span className="text-[#667085]">Me</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        className="rounded-md p-1.5 text-[#98a2b3] hover:bg-[#f2f4f7] hover:text-[#475467]"
+                        aria-label={`Actions for ${file.name}`}
+                      />
+                    }
                   >
-                    Move to folder
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onRenameFile(file)}>
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => onDeleteFile(file)}
-                  >
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
+                    <MoreHorizontal className="size-[18px]" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-36">
+                    <DropdownMenuItem
+                      render={<a href={`/api/file/${file.id}/download`} />}
+                    >
+                      Download
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onShareFile(file)}>
+                      Share
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setDestinationId(file.folderId || "");
+                        setMovingFile(file);
+                      }}
+                    >
+                      Move to folder
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRenameFile(file)}>
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => onDeleteFile(file)}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
           </>
         ) : (
           <p className="px-5 py-8 text-center text-sm text-[#98a2b3]">
@@ -226,9 +286,6 @@ export function RecentFiles({
                   </option>
                 ))}
             </select>
-            {moveError && (
-              <p className="mt-2 text-sm text-red-500">{moveError}</p>
-            )}
           </div>
           <DialogFooter>
             <button

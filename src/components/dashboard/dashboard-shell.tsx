@@ -14,7 +14,15 @@ import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { FolderGrid, type FolderItem } from "@/components/dashboard/folder-grid";
 import { RecentFiles, type FileItem } from "@/components/dashboard/recent-files";
 import { FileGrid } from "@/components/dashboard/file-grid";
+import { ShareDialog } from "@/components/dashboard/share-dialog";
+import { FilePreviewModal } from "@/components/dashboard/file-preview-modal";
 import { ViewToggle, type DashboardView } from "@/components/dashboard/view-toggle";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FolderOpen } from "lucide-react";
+import { toast } from "@/components/ui/toast";
 
 type FileCategory = "all" | "media" | "docs" | "images" | "others";
 type RenameTarget =
@@ -32,30 +40,45 @@ export function DashboardShell() {
   const [view, setView] = useState<DashboardView>("grid");
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [renameError, setRenameError] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RenameTarget | null>(null);
-  const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [moveTarget, setMoveTarget] = useState<FileItem | null>(null);
   const [moveDestination, setMoveDestination] = useState("");
-  const [moveError, setMoveError] = useState("");
   const [moving, setMoving] = useState(false);
+  const [filesLoading, setFilesLoading] = useState(true);
+  const [foldersLoading, setFoldersLoading] = useState(true);
+  const [shareTarget, setShareTarget] = useState<FileItem | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<FileItem | null>(null);
 
   useEffect(() => {
     async function fetchFiles() {
+      setFilesLoading(true);
       try {
         const response = await fetch(
           `/api/file?folderId=${encodeURIComponent(currentFolderId || "")}`,
         );
         if (!response.ok) {
-          console.error("Failed to fetch files");
+          toast.add({
+            id: "dashboard-load-files",
+            type: "error",
+            title: "Unable to load files",
+            description: "Please try again.",
+          });
           return;
         }
         const data = await response.json();
         setFiles(data.files);
       } catch (error) {
         console.error("Failed to fetch files:", error);
+        toast.add({
+          id: "dashboard-load-files",
+          type: "error",
+          title: "Unable to load files",
+          description: "Please try again.",
+        });
+      } finally {
+        setFilesLoading(false);
       }
     }
     fetchFiles();
@@ -77,16 +100,30 @@ export function DashboardShell() {
 
   useEffect(() => {
     async function fetchFolders() {
+      setFoldersLoading(true);
       try {
         const response = await fetch("/api/folder?all=true");
         if (!response.ok) {
-          console.error("Failed to fetch folders");
+          toast.add({
+            id: "dashboard-load-folders",
+            type: "error",
+            title: "Unable to load folders",
+            description: "Please try again.",
+          });
           return;
         }
         const data = await response.json();
         setFolders(data.folders);
       } catch (error) {
         console.error("Failed to fetch folders:", error);
+        toast.add({
+          id: "dashboard-load-folders",
+          type: "error",
+          title: "Unable to load folders",
+          description: "Please try again.",
+        });
+      } finally {
+        setFoldersLoading(false);
       }
     }
     fetchFolders();
@@ -103,6 +140,12 @@ export function DashboardShell() {
       const data = await response.json();
       if (!response.ok) {
         console.error("Upload failed:", data.error);
+        toast.add({
+          id: "dashboard-upload",
+          type: "error",
+          title: "Upload failed",
+          description: data.message || data.error || "Please try again.",
+        });
         return;
       }
       setFiles((currentFiles) => [
@@ -116,8 +159,20 @@ export function DashboardShell() {
         },
         ...currentFiles,
       ]);
+      toast.add({
+        id: "dashboard-upload",
+        type: "success",
+        title: "File uploaded",
+        description: `${file.name} was uploaded successfully.`,
+      });
     } catch (error) {
       console.error("Upload error:", error);
+      toast.add({
+        id: "dashboard-upload",
+        type: "error",
+        title: "Upload failed",
+        description: "Something went wrong while uploading the file.",
+      });
     } finally {
       event.target.value = "";
     }
@@ -126,12 +181,16 @@ export function DashboardShell() {
   function openRename(type: "file" | "folder", item: FileItem | FolderItem) {
     setRenameTarget(type === "file" ? { type, item: item as FileItem } : { type, item: item as FolderItem });
     setRenameValue(item.name);
-    setRenameError("");
   }
 
   async function renameItem() {
     if (!renameTarget || !renameValue.trim()) {
-      setRenameError("A name is required.");
+      toast.add({
+        id: "dashboard-rename",
+        type: "error",
+        title: "Rename failed",
+        description: "A name is required.",
+      });
       return;
     }
     try {
@@ -146,7 +205,12 @@ export function DashboardShell() {
       );
       const data = await response.json();
       if (!response.ok) {
-        setRenameError(data.message || "Rename failed.");
+        toast.add({
+          id: "dashboard-rename",
+          type: "error",
+          title: "Rename failed",
+          description: data.message || "Please try again.",
+        });
         return;
       }
       if (renameTarget.type === "file") {
@@ -165,9 +229,20 @@ export function DashboardShell() {
         );
       }
       setRenameTarget(null);
+      toast.add({
+        id: "dashboard-rename",
+        type: "success",
+        title: "Renamed successfully",
+        description: `${renameValue.trim()} was renamed successfully.`,
+      });
     } catch (error) {
       console.error("Rename error:", error);
-      setRenameError("Something went wrong while renaming.");
+      toast.add({
+        id: "dashboard-rename",
+        type: "error",
+        title: "Rename failed",
+        description: "Something went wrong while renaming.",
+      });
     } finally {
       setRenaming(false);
     }
@@ -183,7 +258,12 @@ export function DashboardShell() {
       );
       const data = await response.json();
       if (!response.ok) {
-        setDeleteError(data.message || "Delete failed.");
+        toast.add({
+          id: "dashboard-delete",
+          type: "error",
+          title: "Delete failed",
+          description: data.message || "Please try again.",
+        });
         return;
       }
       if (deleteTarget.type === "file") {
@@ -192,9 +272,20 @@ export function DashboardShell() {
         setFolders((items) => items.filter((item) => item.id !== deleteTarget.item.id));
       }
       setDeleteTarget(null);
+      toast.add({
+        id: "dashboard-delete",
+        type: "success",
+        title: "Deleted successfully",
+        description: `${deleteTarget.item.name} was deleted successfully.`,
+      });
     } catch (error) {
       console.error("Delete error:", error);
-      setDeleteError("Something went wrong while deleting.");
+      toast.add({
+        id: "dashboard-delete",
+        type: "error",
+        title: "Delete failed",
+        description: "Something went wrong while deleting.",
+      });
     } finally {
       setDeleting(false);
     }
@@ -204,7 +295,6 @@ export function DashboardShell() {
     if (!moveTarget) return;
     try {
       setMoving(true);
-      setMoveError("");
       const response = await fetch(`/api/file/${moveTarget.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -212,7 +302,12 @@ export function DashboardShell() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setMoveError(data.message || "Move failed.");
+        toast.add({
+          id: "dashboard-move",
+          type: "error",
+          title: "Move failed",
+          description: data.message || "Please try again.",
+        });
         return;
       }
       setFiles((items) =>
@@ -223,9 +318,20 @@ export function DashboardShell() {
           .filter((item) => item.folderId === currentFolderId),
       );
       setMoveTarget(null);
+      toast.add({
+        id: "dashboard-move",
+        type: "success",
+        title: "Moved successfully",
+        description: `${moveTarget.name} was moved successfully.`,
+      });
     } catch (error) {
       console.error("Move error:", error);
-      setMoveError("Something went wrong while moving.");
+      toast.add({
+        id: "dashboard-move",
+        type: "error",
+        title: "Move failed",
+        description: "Something went wrong while moving.",
+      });
     } finally {
       setMoving(false);
     }
@@ -263,19 +369,19 @@ export function DashboardShell() {
     folders: currentFolders,
     onNavigate: setCurrentFolderId,
     onRenameFile: (file: FileItem) => openRename("file", file),
+    onShareFile: (file: FileItem) => setShareTarget(file),
+    onPreviewFile: (file: FileItem) => setPreviewTarget(file),
     onDeleteFile: (file: FileItem) => {
-      setDeleteError("");
       setDeleteTarget({ type: "file", item: file });
     },
     onRenameFolder: (folder: FolderItem) => openRename("folder", folder),
     onDeleteFolder: (folder: FolderItem) => {
-      setDeleteError("");
       setDeleteTarget({ type: "folder", item: folder });
     },
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa] text-[#1d2939]">
+    <div className="min-h-screen bg-muted/30 text-foreground">
       <DashboardHeader searchQuery={searchQuery} onSearchChange={setSearchQuery} onMenuClick={() => setSidebarOpen(true)} username={username} />
       <div className="flex">
         <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
@@ -283,19 +389,34 @@ export function DashboardShell() {
           <div className="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">
             <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#8491a5]">Workspace</p>
-                <h1 className="text-[27px] font-semibold tracking-[-0.03em] text-[#182230]">{viewConfig[activeCategory].title}</h1>
-                <p className="mt-1 text-sm text-[#8793a6]">{viewConfig[activeCategory].description}</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
+                <h1 className="text-[27px] font-semibold tracking-[-0.03em]">{viewConfig[activeCategory].title}</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{viewConfig[activeCategory].description}</p>
               </div>
               <div className="flex items-center gap-2">
                 <ViewToggle value={view} onChange={setView} />
-                <label className="cursor-pointer rounded-lg bg-[#246bfe] px-4 py-2.5 text-sm font-medium text-white">
+                <Button nativeButton={false} render={<label className="cursor-pointer" />}>
                   <span>Upload file</span>
                   <input type="file" className="sr-only" onChange={handleFileUpload} />
-                </label>
+                </Button>
               </div>
             </div>
 
+            {(filesLoading || foldersLoading) ? (
+              <div className="flex flex-col gap-6" aria-label="Loading workspace" aria-busy="true">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(205px,1fr))] gap-3">
+                  {Array.from({ length: 4 }, (_, index) => (
+                    <Skeleton key={index} className="h-[66px] rounded-lg" />
+                  ))}
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4">
+                  {Array.from({ length: 6 }, (_, index) => (
+                    <Skeleton key={index} className="h-56 rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
             {activeCategory === "all" && (
               <FolderGrid
                 query={normalizedQuery}
@@ -305,7 +426,6 @@ export function DashboardShell() {
                 onFolderCreated={(folder) => setFolders((items) => [folder, ...items])}
                 onRenameFolder={(folder) => openRename("folder", folder)}
                 onDeleteFolder={(folder) => {
-                  setDeleteError("");
                   setDeleteTarget({ type: "folder", item: folder });
                 }}
                 showFolders={view === "grid"}
@@ -319,7 +439,6 @@ export function DashboardShell() {
                   folders={[]}
                   onMoveFile={(file) => {
                     setMoveDestination(file.folderId || "");
-                    setMoveError("");
                     setMoveTarget(file);
                   }}
                 />
@@ -336,18 +455,47 @@ export function DashboardShell() {
                 }
               />
             )}
+              </>
+            )}
+
+            {!filesLoading && !foldersLoading && folders.length === 0 && files.length === 0 && !searchQuery && activeCategory === "all" && (
+              <Empty className="mt-6 min-h-64 border">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon"><FolderOpen /></EmptyMedia>
+                  <EmptyTitle>Your workspace is empty</EmptyTitle>
+                  <EmptyDescription>Upload a file or create a folder to get started.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
           </div>
         </main>
       </div>
+      {shareTarget && (
+        <ShareDialog
+          fileId={shareTarget.id}
+          fileName={shareTarget.name}
+          open={Boolean(shareTarget)}
+          onOpenChange={(open) => !open && setShareTarget(null)}
+        />
+      )}
+      {previewTarget && (
+        <FilePreviewModal
+          file={previewTarget}
+          onClose={() => setPreviewTarget(null)}
+          onShare={() => setShareTarget(previewTarget)}
+          onDownload={() => window.location.assign(`/api/file/${previewTarget.id}/download`)}
+          canShare
+          canDownload
+        />
+      )}
 
       <Dialog open={Boolean(renameTarget)} onOpenChange={(open) => !open && !renaming && setRenameTarget(null)}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader><DialogTitle>Rename {renameTarget?.type}</DialogTitle><DialogDescription>Enter a new name for this {renameTarget?.type}.</DialogDescription></DialogHeader>
-          <input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} maxLength={255} className="rounded-lg border border-[#d0d5dd] px-3 py-2.5 text-sm outline-none focus:border-[#246bfe]" />
-          {renameError && <p className="text-sm text-red-500">{renameError}</p>}
+          <Input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} maxLength={255} aria-label="New name" />
           <DialogFooter>
-            <button type="button" onClick={() => setRenameTarget(null)} disabled={renaming} className="rounded-lg border border-[#d0d5dd] px-4 py-2 text-sm">Cancel</button>
-            <button type="button" onClick={renameItem} disabled={renaming || !renameValue.trim()} className="rounded-lg bg-[#246bfe] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{renaming ? "Saving..." : "Save"}</button>
+            <Button type="button" variant="outline" onClick={() => setRenameTarget(null)} disabled={renaming}>Cancel</Button>
+            <Button type="button" onClick={renameItem} disabled={renaming || !renameValue.trim()}>{renaming ? "Saving..." : "Save"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -355,10 +503,9 @@ export function DashboardShell() {
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader><DialogTitle>Delete {deleteTarget?.type}?</DialogTitle><DialogDescription>This action cannot be undone. {deleteTarget?.type === "folder" && "Folders must be empty before they can be deleted."}</DialogDescription></DialogHeader>
-          {deleteError && <p className="text-sm text-red-500">{deleteError}</p>}
           <DialogFooter>
-            <button type="button" onClick={() => setDeleteTarget(null)} disabled={deleting} className="rounded-lg border border-[#d0d5dd] px-4 py-2 text-sm">Cancel</button>
-            <button type="button" onClick={deleteItem} disabled={deleting} className="rounded-lg bg-[#d92d20] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{deleting ? "Deleting..." : "Delete"}</button>
+            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={deleteItem} disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -370,10 +517,9 @@ export function DashboardShell() {
             <option value="">My Files</option>
             {folders.filter((folder) => folder.id !== moveTarget?.folderId).map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
           </select>
-          {moveError && <p className="text-sm text-red-500">{moveError}</p>}
           <DialogFooter>
-            <button type="button" onClick={() => setMoveTarget(null)} disabled={moving} className="rounded-lg border border-[#d0d5dd] px-4 py-2 text-sm">Cancel</button>
-            <button type="button" onClick={moveFile} disabled={moving} className="rounded-lg bg-[#246bfe] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{moving ? "Moving..." : "Move file"}</button>
+            <Button type="button" variant="outline" onClick={() => setMoveTarget(null)} disabled={moving}>Cancel</Button>
+            <Button type="button" onClick={moveFile} disabled={moving}>{moving ? "Moving..." : "Move file"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

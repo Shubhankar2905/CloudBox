@@ -1,6 +1,7 @@
 "use client";
 
 import { Grid2X2, List } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export type DashboardView = "grid" | "list";
 
@@ -11,30 +12,25 @@ type ViewToggleProps = {
 
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
-    <div
-      className="flex items-center rounded-lg border border-[#e1e6ed] bg-white p-1"
+    <ToggleGroup
+      value={[value]}
+      onValueChange={(nextValue) => nextValue[0] && onChange(nextValue[0] as DashboardView)}
       aria-label="Change file view"
-      role="group"
+      variant="outline"
+      size="sm"
     >
       {[
         { value: "grid" as const, label: "Grid view", Icon: Grid2X2 },
         { value: "list" as const, label: "List view", Icon: List },
       ].map(({ value: option, label, Icon }) => (
-        <button
+        <ToggleGroupItem
           key={option}
-          type="button"
           aria-label={label}
-          aria-pressed={value === option}
-          onClick={() => onChange(option)}
-          className={`rounded-md p-1.5 transition ${
-            value === option
-              ? "bg-[#edf4ff] text-[#246bfe]"
-              : "text-[#98a2b3] hover:bg-[#f2f4f7] hover:text-[#475467]"
-          }`}
+          value={option}
         >
-          <Icon className="size-4" />
-        </button>
+          <Icon />
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

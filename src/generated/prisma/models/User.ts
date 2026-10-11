@@ -192,6 +192,7 @@ export type UserWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   files?: Prisma.FileListRelationFilter
   folders?: Prisma.FolderListRelationFilter
+  createdSharedLinks?: Prisma.SharedLinkListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -203,6 +204,7 @@ export type UserOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   files?: Prisma.FileOrderByRelationAggregateInput
   folders?: Prisma.FolderOrderByRelationAggregateInput
+  createdSharedLinks?: Prisma.SharedLinkOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -217,6 +219,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   files?: Prisma.FileListRelationFilter
   folders?: Prisma.FolderListRelationFilter
+  createdSharedLinks?: Prisma.SharedLinkListRelationFilter
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -252,6 +255,7 @@ export type UserCreateInput = {
   updatedAt?: Date | string
   files?: Prisma.FileCreateNestedManyWithoutUserInput
   folders?: Prisma.FolderCreateNestedManyWithoutOwnerInput
+  createdSharedLinks?: Prisma.SharedLinkCreateNestedManyWithoutCreatedByInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -263,6 +267,7 @@ export type UserUncheckedCreateInput = {
   updatedAt?: Date | string
   files?: Prisma.FileUncheckedCreateNestedManyWithoutUserInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutOwnerInput
+  createdSharedLinks?: Prisma.SharedLinkUncheckedCreateNestedManyWithoutCreatedByInput
 }
 
 export type UserUpdateInput = {
@@ -274,6 +279,7 @@ export type UserUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   files?: Prisma.FileUpdateManyWithoutUserNestedInput
   folders?: Prisma.FolderUpdateManyWithoutOwnerNestedInput
+  createdSharedLinks?: Prisma.SharedLinkUpdateManyWithoutCreatedByNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -285,6 +291,7 @@ export type UserUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   files?: Prisma.FileUncheckedUpdateManyWithoutUserNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutOwnerNestedInput
+  createdSharedLinks?: Prisma.SharedLinkUncheckedUpdateManyWithoutCreatedByNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -386,6 +393,20 @@ export type UserUpdateOneRequiredWithoutFoldersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFoldersInput, Prisma.UserUpdateWithoutFoldersInput>, Prisma.UserUncheckedUpdateWithoutFoldersInput>
 }
 
+export type UserCreateNestedOneWithoutCreatedSharedLinksInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCreatedSharedLinksInput, Prisma.UserUncheckedCreateWithoutCreatedSharedLinksInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCreatedSharedLinksInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCreatedSharedLinksNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCreatedSharedLinksInput, Prisma.UserUncheckedCreateWithoutCreatedSharedLinksInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCreatedSharedLinksInput
+  upsert?: Prisma.UserUpsertWithoutCreatedSharedLinksInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCreatedSharedLinksInput, Prisma.UserUpdateWithoutCreatedSharedLinksInput>, Prisma.UserUncheckedUpdateWithoutCreatedSharedLinksInput>
+}
+
 export type UserCreateWithoutFilesInput = {
   id?: string
   email: string
@@ -394,6 +415,7 @@ export type UserCreateWithoutFilesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   folders?: Prisma.FolderCreateNestedManyWithoutOwnerInput
+  createdSharedLinks?: Prisma.SharedLinkCreateNestedManyWithoutCreatedByInput
 }
 
 export type UserUncheckedCreateWithoutFilesInput = {
@@ -404,6 +426,7 @@ export type UserUncheckedCreateWithoutFilesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutOwnerInput
+  createdSharedLinks?: Prisma.SharedLinkUncheckedCreateNestedManyWithoutCreatedByInput
 }
 
 export type UserCreateOrConnectWithoutFilesInput = {
@@ -430,6 +453,7 @@ export type UserUpdateWithoutFilesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   folders?: Prisma.FolderUpdateManyWithoutOwnerNestedInput
+  createdSharedLinks?: Prisma.SharedLinkUpdateManyWithoutCreatedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFilesInput = {
@@ -440,6 +464,7 @@ export type UserUncheckedUpdateWithoutFilesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   folders?: Prisma.FolderUncheckedUpdateManyWithoutOwnerNestedInput
+  createdSharedLinks?: Prisma.SharedLinkUncheckedUpdateManyWithoutCreatedByNestedInput
 }
 
 export type UserCreateWithoutFoldersInput = {
@@ -450,6 +475,7 @@ export type UserCreateWithoutFoldersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   files?: Prisma.FileCreateNestedManyWithoutUserInput
+  createdSharedLinks?: Prisma.SharedLinkCreateNestedManyWithoutCreatedByInput
 }
 
 export type UserUncheckedCreateWithoutFoldersInput = {
@@ -460,6 +486,7 @@ export type UserUncheckedCreateWithoutFoldersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   files?: Prisma.FileUncheckedCreateNestedManyWithoutUserInput
+  createdSharedLinks?: Prisma.SharedLinkUncheckedCreateNestedManyWithoutCreatedByInput
 }
 
 export type UserCreateOrConnectWithoutFoldersInput = {
@@ -486,6 +513,7 @@ export type UserUpdateWithoutFoldersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   files?: Prisma.FileUpdateManyWithoutUserNestedInput
+  createdSharedLinks?: Prisma.SharedLinkUpdateManyWithoutCreatedByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFoldersInput = {
@@ -496,6 +524,67 @@ export type UserUncheckedUpdateWithoutFoldersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   files?: Prisma.FileUncheckedUpdateManyWithoutUserNestedInput
+  createdSharedLinks?: Prisma.SharedLinkUncheckedUpdateManyWithoutCreatedByNestedInput
+}
+
+export type UserCreateWithoutCreatedSharedLinksInput = {
+  id?: string
+  email: string
+  password?: string | null
+  name: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  files?: Prisma.FileCreateNestedManyWithoutUserInput
+  folders?: Prisma.FolderCreateNestedManyWithoutOwnerInput
+}
+
+export type UserUncheckedCreateWithoutCreatedSharedLinksInput = {
+  id?: string
+  email: string
+  password?: string | null
+  name: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  files?: Prisma.FileUncheckedCreateNestedManyWithoutUserInput
+  folders?: Prisma.FolderUncheckedCreateNestedManyWithoutOwnerInput
+}
+
+export type UserCreateOrConnectWithoutCreatedSharedLinksInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCreatedSharedLinksInput, Prisma.UserUncheckedCreateWithoutCreatedSharedLinksInput>
+}
+
+export type UserUpsertWithoutCreatedSharedLinksInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCreatedSharedLinksInput, Prisma.UserUncheckedUpdateWithoutCreatedSharedLinksInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCreatedSharedLinksInput, Prisma.UserUncheckedCreateWithoutCreatedSharedLinksInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCreatedSharedLinksInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCreatedSharedLinksInput, Prisma.UserUncheckedUpdateWithoutCreatedSharedLinksInput>
+}
+
+export type UserUpdateWithoutCreatedSharedLinksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  files?: Prisma.FileUpdateManyWithoutUserNestedInput
+  folders?: Prisma.FolderUpdateManyWithoutOwnerNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCreatedSharedLinksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  files?: Prisma.FileUncheckedUpdateManyWithoutUserNestedInput
+  folders?: Prisma.FolderUncheckedUpdateManyWithoutOwnerNestedInput
 }
 
 
@@ -506,11 +595,13 @@ export type UserUncheckedUpdateWithoutFoldersInput = {
 export type UserCountOutputType = {
   files: number
   folders: number
+  createdSharedLinks: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   files?: boolean | UserCountOutputTypeCountFilesArgs
   folders?: boolean | UserCountOutputTypeCountFoldersArgs
+  createdSharedLinks?: boolean | UserCountOutputTypeCountCreatedSharedLinksArgs
 }
 
 /**
@@ -537,6 +628,13 @@ export type UserCountOutputTypeCountFoldersArgs<ExtArgs extends runtime.Types.Ex
   where?: Prisma.FolderWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCreatedSharedLinksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SharedLinkWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -547,6 +645,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   updatedAt?: boolean
   files?: boolean | Prisma.User$filesArgs<ExtArgs>
   folders?: boolean | Prisma.User$foldersArgs<ExtArgs>
+  createdSharedLinks?: boolean | Prisma.User$createdSharedLinksArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -581,6 +680,7 @@ export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   files?: boolean | Prisma.User$filesArgs<ExtArgs>
   folders?: boolean | Prisma.User$foldersArgs<ExtArgs>
+  createdSharedLinks?: boolean | Prisma.User$createdSharedLinksArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -591,6 +691,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     files: Prisma.$FilePayload<ExtArgs>[]
     folders: Prisma.$FolderPayload<ExtArgs>[]
+    createdSharedLinks: Prisma.$SharedLinkPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -995,6 +1096,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   files<T extends Prisma.User$filesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$filesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FilePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   folders<T extends Prisma.User$foldersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$foldersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FolderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  createdSharedLinks<T extends Prisma.User$createdSharedLinksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$createdSharedLinksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SharedLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1468,6 +1570,30 @@ export type User$foldersArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
   take?: number
   skip?: number
   distinct?: Prisma.FolderScalarFieldEnum | Prisma.FolderScalarFieldEnum[]
+}
+
+/**
+ * User.createdSharedLinks
+ */
+export type User$createdSharedLinksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SharedLink
+   */
+  select?: Prisma.SharedLinkSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SharedLink
+   */
+  omit?: Prisma.SharedLinkOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SharedLinkInclude<ExtArgs> | null
+  where?: Prisma.SharedLinkWhereInput
+  orderBy?: Prisma.SharedLinkOrderByWithRelationInput | Prisma.SharedLinkOrderByWithRelationInput[]
+  cursor?: Prisma.SharedLinkWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SharedLinkScalarFieldEnum | Prisma.SharedLinkScalarFieldEnum[]
 }
 
 /**

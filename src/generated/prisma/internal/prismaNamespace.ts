@@ -399,7 +399,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   User: 'User',
   File: 'File',
-  Folder: 'Folder'
+  Folder: 'Folder',
+  SharedLink: 'SharedLink'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -415,7 +416,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "file" | "folder"
+    modelProps: "user" | "file" | "folder" | "sharedLink"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -641,6 +642,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    SharedLink: {
+      payload: Prisma.$SharedLinkPayload<ExtArgs>
+      fields: Prisma.SharedLinkFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SharedLinkFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SharedLinkFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>
+        }
+        findFirst: {
+          args: Prisma.SharedLinkFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SharedLinkFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>
+        }
+        findMany: {
+          args: Prisma.SharedLinkFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>[]
+        }
+        create: {
+          args: Prisma.SharedLinkCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>
+        }
+        createMany: {
+          args: Prisma.SharedLinkCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SharedLinkCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>[]
+        }
+        delete: {
+          args: Prisma.SharedLinkDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>
+        }
+        update: {
+          args: Prisma.SharedLinkUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>
+        }
+        deleteMany: {
+          args: Prisma.SharedLinkDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SharedLinkUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SharedLinkUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>[]
+        }
+        upsert: {
+          args: Prisma.SharedLinkUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SharedLinkPayload>
+        }
+        aggregate: {
+          args: Prisma.SharedLinkAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSharedLink>
+        }
+        groupBy: {
+          args: Prisma.SharedLinkGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SharedLinkGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SharedLinkCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SharedLinkCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -719,6 +794,20 @@ export const FolderScalarFieldEnum = {
 export type FolderScalarFieldEnum = (typeof FolderScalarFieldEnum)[keyof typeof FolderScalarFieldEnum]
 
 
+export const SharedLinkScalarFieldEnum = {
+  id: 'id',
+  tokenHash: 'tokenHash',
+  fileId: 'fileId',
+  createdById: 'createdById',
+  allowDownload: 'allowDownload',
+  expiresAt: 'expiresAt',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SharedLinkScalarFieldEnum = (typeof SharedLinkScalarFieldEnum)[keyof typeof SharedLinkScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -788,6 +877,13 @@ export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 
  * Reference to a field of type 'BigInt[]'
  */
 export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 
@@ -972,6 +1068,7 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   file?: Prisma.FileOmit
   folder?: Prisma.FolderOmit
+  sharedLink?: Prisma.SharedLinkOmit
 }
 
 /* Types for Logging */

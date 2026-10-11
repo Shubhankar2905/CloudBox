@@ -18,6 +18,7 @@ export async function GET(
     }
 
     const { id } = await params;
+    const jsonFormat = req.nextUrl.searchParams.get("format") === "json";
     const file = await prisma.file.findFirst({
       where: { id, userId: decoded.userId },
     });
@@ -35,6 +36,14 @@ export async function GET(
       }),
       { expiresIn: 300 },
     );
+
+    if (jsonFormat) {
+      return NextResponse.json({
+        url: previewUrl,
+        name: file.name,
+        mimeType: file.mimeType,
+      });
+    }
 
     return NextResponse.redirect(previewUrl);
   } catch (error) {

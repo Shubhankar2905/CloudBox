@@ -23,6 +23,8 @@ type FileGridProps = {
   query: string;
   onNavigate: (folderId: string) => void;
   onMoveFile: (file: FileItem) => void;
+  onPreviewFile: (file: FileItem) => void;
+  onShareFile: (file: FileItem) => void;
   onRenameFile: (file: FileItem) => void;
   onDeleteFile: (file: FileItem) => void;
   onRenameFolder: (folder: FolderItem) => void;
@@ -35,6 +37,8 @@ export function FileGrid({
   query,
   onNavigate,
   onMoveFile,
+  onPreviewFile,
+  onShareFile,
   onRenameFile,
   onDeleteFile,
   onRenameFolder,
@@ -90,7 +94,7 @@ export function FileGrid({
               const Icon = getFileIcon(file.mimeType);
               const canPreview = file.mimeType.startsWith("image/");
               return (
-                <article key={file.id} className="group overflow-hidden rounded-xl border border-[#e4e8ee] bg-white transition hover:border-[#b8cdf7] hover:shadow-[0_6px_18px_rgba(25,65,125,0.08)]">
+                <article key={file.id} onDoubleClick={() => onPreviewFile(file)} className="group overflow-hidden rounded-xl border border-[#e4e8ee] bg-white transition hover:border-[#b8cdf7] hover:shadow-[0_6px_18px_rgba(25,65,125,0.08)]">
                   <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[#f7f9fc]">
                     {canPreview ? (
                       <div
@@ -108,6 +112,7 @@ export function FileGrid({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem render={<a href={`/api/file/${file.id}/download`} />}>Download</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onShareFile(file)}>Share</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onMoveFile(file)}>Move to folder</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onRenameFile(file)}><Pencil /> Rename</DropdownMenuItem>
                         <DropdownMenuItem variant="destructive" onClick={() => onDeleteFile(file)}><Trash2 /> Delete</DropdownMenuItem>

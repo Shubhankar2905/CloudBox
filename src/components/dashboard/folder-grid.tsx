@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "@/components/ui/toast";
 
 export type FolderItem = {
   id: string;
@@ -49,7 +50,6 @@ export function FolderGrid({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState("");
 
   const visibleFolders = folders
     .filter((folder) => folder.parentId === currentFolderId)
@@ -69,13 +69,17 @@ export function FolderGrid({
   async function createFolder() {
     const trimmedName = folderName.trim();
     if (!trimmedName) {
-      setError("Folder name is required");
+      toast.add({
+        id: "dashboard-create-folder",
+        type: "error",
+        title: "Folder creation failed",
+        description: "A folder name is required.",
+      });
       return;
     }
 
     try {
       setCreating(true);
-      setError("");
       const response = await fetch("/api/folder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,15 +87,31 @@ export function FolderGrid({
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.message || "Failed to create folder");
+        toast.add({
+          id: "dashboard-create-folder",
+          type: "error",
+          title: "Folder creation failed",
+          description: data.message || "Please try again.",
+        });
         return;
       }
       onFolderCreated(data.folder);
       setFolderName("");
       setIsCreateOpen(false);
+      toast.add({
+        id: "dashboard-create-folder",
+        type: "success",
+        title: "Folder created",
+        description: `${trimmedName} was created successfully.`,
+      });
     } catch (createError) {
       console.error("Create folder error:", createError);
-      setError("Something went wrong while creating the folder.");
+      toast.add({
+        id: "dashboard-create-folder",
+        type: "error",
+        title: "Folder creation failed",
+        description: "Something went wrong while creating the folder.",
+      });
     } finally {
       setCreating(false);
     }
@@ -100,7 +120,6 @@ export function FolderGrid({
   function closeCreateDialog() {
     if (creating) return;
     setFolderName("");
-    setError("");
     setIsCreateOpen(false);
   }
 
@@ -147,7 +166,6 @@ export function FolderGrid({
             type="button"
             onClick={() => {
               setFolderName("");
-              setError("");
               setIsCreateOpen(true);
             }}
             className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#246bfe] px-3.5 py-2 text-sm font-medium text-white shadow-[0_5px_12px_rgba(36,107,254,0.2)] transition hover:bg-[#155eef]"
@@ -230,7 +248,6 @@ export function FolderGrid({
               value={folderName}
               onChange={(event) => {
                 setFolderName(event.target.value);
-                setError("");
               }}
               onKeyDown={(event) =>
                 event.key === "Enter" && !creating && createFolder()
@@ -239,7 +256,6 @@ export function FolderGrid({
               maxLength={255}
               className="w-full rounded-lg border border-[#d0d5dd] px-3 py-2.5 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#246bfe] focus:ring-2 focus:ring-[#246bfe]/10"
             />
-            {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
           </div>
           <DialogFooter>
             <button

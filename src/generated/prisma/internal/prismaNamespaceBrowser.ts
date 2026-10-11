@@ -53,7 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   User: 'User',
   File: 'File',
-  Folder: 'Folder'
+  Folder: 'Folder',
+  SharedLink: 'SharedLink'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -109,6 +110,20 @@ export const FolderScalarFieldEnum = {
 } as const
 
 export type FolderScalarFieldEnum = (typeof FolderScalarFieldEnum)[keyof typeof FolderScalarFieldEnum]
+
+
+export const SharedLinkScalarFieldEnum = {
+  id: 'id',
+  tokenHash: 'tokenHash',
+  fileId: 'fileId',
+  createdById: 'createdById',
+  allowDownload: 'allowDownload',
+  expiresAt: 'expiresAt',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SharedLinkScalarFieldEnum = (typeof SharedLinkScalarFieldEnum)[keyof typeof SharedLinkScalarFieldEnum]
 
 
 export const SortOrder = {

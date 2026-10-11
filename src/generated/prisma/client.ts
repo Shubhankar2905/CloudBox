@@ -56,3 +56,8 @@ export type File = Prisma.FileModel
  * 
  */
 export type Folder = Prisma.FolderModel
+/**
+ * Model SharedLink
+ * 
+ */
+export type SharedLink = Prisma.SharedLinkModel
