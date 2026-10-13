@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,17 +11,39 @@ import {
 } from "@/components/ui/dialog";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
-import { FolderGrid, type FolderItem } from "@/components/dashboard/folder-grid";
-import { RecentFiles, type FileItem } from "@/components/dashboard/recent-files";
+import {
+  FolderGrid,
+  type FolderItem,
+} from "@/components/dashboard/folder-grid";
+import {
+  RecentFiles,
+  type FileItem,
+} from "@/components/dashboard/recent-files";
 import { FileGrid } from "@/components/dashboard/file-grid";
 import { ShareDialog } from "@/components/dashboard/share-dialog";
 import { FilePreviewModal } from "@/components/dashboard/file-preview-modal";
-import { ViewToggle, type DashboardView } from "@/components/dashboard/view-toggle";
+import {
+  ViewToggle,
+  type DashboardView,
+} from "@/components/dashboard/view-toggle";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FolderOpen } from "lucide-react";
+import { ChevronDown, FolderOpen, UploadCloud } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Progress, ProgressLabel } from "@/components/ui/progress";
 import { toast } from "@/components/ui/toast";
 import { getFileCategory, type FileCategory } from "@/lib/file-category";
 
@@ -50,6 +72,18 @@ export function DashboardShell() {
   const [foldersLoading, setFoldersLoading] = useState(true);
   const [shareTarget, setShareTarget] = useState<FileItem | null>(null);
   const [previewTarget, setPreviewTarget] = useState<FileItem | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [folderFiles, setFolderFiles] = useState<File[]>([]);
+  const [folderName, setFolderName] = useState("");
+  const [folderUploadState, setFolderUploadState] = useState<
+    "idle" | "uploading" | "complete" | "error" | "cancelled"
+  >("idle");
+  const [folderUploadCount, setFolderUploadCount] = useState(0);
+  const [folderUploadError, setFolderUploadError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const uploadRequestRef = useRef<XMLHttpRequest | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -73,7 +107,8 @@ export function DashboardShell() {
         const data = await response.json();
         setFiles(data.files);
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (error instanceof DOMException && error.name === "AbortError")
+          return;
         console.error("Failed to fetch files:", error);
         toast.add({
           id: "dashboard-load-files",
@@ -88,7 +123,7 @@ export function DashboardShell() {
     fetchFiles();
 
     return () => controller.abort();
-  }, [activeCategory, currentFolderId]);
+  }, [activeCategory, currentFolderId, refreshKey]);
 
   useEffect(() => {
     async function fetchCurrentUser() {
@@ -133,7 +168,7 @@ export function DashboardShell() {
       }
     }
     fetchFolders();
-  }, []);
+  }, [refreshKey]);
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -142,7 +177,10 @@ export function DashboardShell() {
       const formData = new FormData();
       formData.append("file", file);
       if (currentFolderId) formData.append("folderId", currentFolderId);
-      const response = await fetch("/api/upload", { method: "POST", body: formData });
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
       const data = await response.json();
       if (!response.ok) {
         console.error("Upload failed:", data.error);
@@ -165,6 +203,7 @@ export function DashboardShell() {
         },
         ...currentFiles,
       ]);
+      setRefreshKey((value) => value + 1);
       toast.add({
         id: "dashboard-upload",
         type: "success",
@@ -184,8 +223,103 @@ export function DashboardShell() {
     }
   }
 
+  function handleFolderSelection(event: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!selectedFiles.length) return;
+
+    const firstPath = selectedFiles[0].webkitRelativePath;
+    setFolderName(firstPath?.split("/")[0] || "Selected folder");
+    setFolderFiles(selectedFiles);
+    setFolderUploadCount(0);
+    setFolderUploadError("");
+    setFolderUploadState("idle");
+    setUploadDialogOpen(true);
+  }
+
+  function uploadFolderFile(file: File) {
+    return new Promise<void>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      uploadRequestRef.current = request;
+      request.open("POST", "/api/upload");
+      request.onload = () => {
+        uploadRequestRef.current = null;
+        if (request.status >= 200 && request.status < 300) resolve();
+        else reject(new Error("Upload failed"));
+      };
+      request.onerror = () => {
+        uploadRequestRef.current = null;
+        reject(new Error("Network error"));
+      };
+      request.onabort = () => {
+        uploadRequestRef.current = null;
+        reject(new DOMException("Upload cancelled", "AbortError"));
+      };
+      const formData = new FormData();
+      formData.append("file", file);
+      if (currentFolderId) formData.append("folderId", currentFolderId);
+      if (file.webkitRelativePath) {
+        formData.append("relativePath", file.webkitRelativePath);
+      }
+      request.send(formData);
+    });
+  }
+
+  async function uploadFolder() {
+    if (!folderFiles.length || folderUploadState === "uploading") return;
+    setFolderUploadState("uploading");
+    setFolderUploadCount(0);
+    setFolderUploadError("");
+
+    try {
+      for (let index = 0; index < folderFiles.length; index += 1) {
+        await uploadFolderFile(folderFiles[index]);
+        setFolderUploadCount(index + 1);
+      }
+      setFolderUploadState("complete");
+      setRefreshKey((value) => value + 1);
+      toast.add({
+        id: "dashboard-folder-upload",
+        type: "success",
+        title: "Folder uploaded",
+        description: `${folderFiles.length} files were uploaded successfully.`,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setFolderUploadState("cancelled");
+        return;
+      }
+      console.error("Folder upload error:", error);
+      setFolderUploadState("error");
+      setFolderUploadError(
+        "Some files could not be uploaded. Please try again.",
+      );
+      toast.add({
+        id: "dashboard-folder-upload",
+        type: "error",
+        title: "Folder upload failed",
+        description: "Some files could not be uploaded.",
+      });
+    }
+  }
+
+  function cancelFolderUpload() {
+    uploadRequestRef.current?.abort();
+  }
+
+  function closeFolderUpload() {
+    if (folderUploadState === "uploading") return;
+    setUploadDialogOpen(false);
+    setFolderFiles([]);
+    setFolderUploadState("idle");
+  }
+
   function openRename(type: "file" | "folder", item: FileItem | FolderItem) {
-    setRenameTarget(type === "file" ? { type, item: item as FileItem } : { type, item: item as FolderItem });
+    setRenameTarget(
+      type === "file"
+        ? { type, item: item as FileItem }
+        : { type, item: item as FolderItem },
+    );
     setRenameValue(item.name);
   }
 
@@ -222,14 +356,20 @@ export function DashboardShell() {
       if (renameTarget.type === "file") {
         setFiles((items) =>
           items.map((item) =>
-            item.id === renameTarget.item.id ? { ...item, name: data.file.name } : item,
+            item.id === renameTarget.item.id
+              ? { ...item, name: data.file.name }
+              : item,
           ),
         );
       } else {
         setFolders((items) =>
           items.map((item) =>
             item.id === renameTarget.item.id
-              ? { ...item, name: data.folder.name, updatedAt: data.folder.updatedAt }
+              ? {
+                  ...item,
+                  name: data.folder.name,
+                  updatedAt: data.folder.updatedAt,
+                }
               : item,
           ),
         );
@@ -273,9 +413,13 @@ export function DashboardShell() {
         return;
       }
       if (deleteTarget.type === "file") {
-        setFiles((items) => items.filter((item) => item.id !== deleteTarget.item.id));
+        setFiles((items) =>
+          items.filter((item) => item.id !== deleteTarget.item.id),
+        );
       } else {
-        setFolders((items) => items.filter((item) => item.id !== deleteTarget.item.id));
+        setFolders((items) =>
+          items.filter((item) => item.id !== deleteTarget.item.id),
+        );
       }
       setDeleteTarget(null);
       toast.add({
@@ -319,9 +463,14 @@ export function DashboardShell() {
       setFiles((items) =>
         items
           .map((item) =>
-            item.id === moveTarget.id ? { ...item, folderId: moveDestination || null } : item,
+            item.id === moveTarget.id
+              ? { ...item, folderId: moveDestination || null }
+              : item,
           )
-          .filter((item) => activeCategory !== "all" || item.folderId === currentFolderId),
+          .filter(
+            (item) =>
+              activeCategory !== "all" || item.folderId === currentFolderId,
+          ),
       );
       setMoveTarget(null);
       toast.add({
@@ -344,14 +493,24 @@ export function DashboardShell() {
   }
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredFiles = files.filter((file) =>
-    activeCategory === "all" || getFileCategory(file.name, file.mimeType) === activeCategory,
+  const filteredFiles = files.filter(
+    (file) =>
+      activeCategory === "all" ||
+      getFileCategory(file.name, file.mimeType) === activeCategory,
   );
-  const currentFolders = activeCategory === "all"
-    ? folders.filter((folder) => folder.parentId === currentFolderId && folder.name.toLowerCase().includes(normalizedQuery))
-    : [];
+  const currentFolders =
+    activeCategory === "all"
+      ? folders.filter(
+          (folder) =>
+            folder.parentId === currentFolderId &&
+            folder.name.toLowerCase().includes(normalizedQuery),
+        )
+      : [];
   const viewConfig = {
-    all: { title: "My Workspace", description: "Manage your files and folders" },
+    all: {
+      title: "My Workspace",
+      description: "Manage your files and folders",
+    },
     images: { title: "Images", description: "All your images" },
     media: { title: "Media", description: "All your media files" },
     docs: { title: "Docs", description: "All your documents" },
@@ -377,7 +536,12 @@ export function DashboardShell() {
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
-      <DashboardHeader searchQuery={searchQuery} onSearchChange={setSearchQuery} onMenuClick={() => setSidebarOpen(true)} username={username} />
+      <DashboardHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onMenuClick={() => setSidebarOpen(true)}
+        username={username}
+      />
       <div className="flex">
         <DashboardSidebar
           open={sidebarOpen}
@@ -392,84 +556,146 @@ export function DashboardShell() {
           <div className="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">
             <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
-                <h1 className="text-[27px] font-semibold tracking-[-0.03em]">{viewConfig[activeCategory].title}</h1>
-                <p className="mt-1 text-sm text-muted-foreground">{viewConfig[activeCategory].description}</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Workspace
+                </p>
+                <h1 className="text-[27px] font-semibold tracking-[-0.03em]">
+                  {viewConfig[activeCategory].title}
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {viewConfig[activeCategory].description}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <ViewToggle value={view} onChange={setView} />
-                <Button nativeButton={false} render={<label className="cursor-pointer" />}>
-                  <span>Upload file</span>
-                  <input type="file" className="sr-only" onChange={handleFileUpload} />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button type="button">
+                        <UploadCloud data-icon="inline-start" />
+                        Upload
+                        <ChevronDown data-icon="inline-end" />
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Upload files
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => folderInputRef.current?.click()}
+                    >
+                      Upload folder
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="sr-only"
+                  onChange={handleFileUpload}
+                />
+                <input
+                  type="file"
+                  className="sr-only"
+                  multiple
+                  onChange={handleFolderSelection}
+                  ref={(input) => {
+                    folderInputRef.current = input;
+                    input?.setAttribute("webkitdirectory", "");
+                  }}
+                />
               </div>
             </div>
 
-            {(filesLoading || foldersLoading) ? (
-              <div className="flex flex-col gap-6" aria-label="Loading workspace" aria-busy="true">
+            {filesLoading || foldersLoading ? (
+              <div
+                className="flex flex-col gap-6"
+                aria-label="Loading workspace"
+                aria-busy="true"
+              >
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(205px,1fr))] gap-3">
-                  {Array.from({ length: 4 }, (_, index) => (
+                  {Array.from({ length: 5 }, (_, index) => (
                     <Skeleton key={index} className="h-[66px] rounded-lg" />
                   ))}
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4">
-                  {Array.from({ length: 6 }, (_, index) => (
+                  {Array.from({ length: 5 }, (_, index) => (
                     <Skeleton key={index} className="h-56 rounded-xl" />
                   ))}
                 </div>
               </div>
             ) : (
               <>
-            {activeCategory === "all" && (
-              <FolderGrid
-                query={normalizedQuery}
-                folders={folders}
-                currentFolderId={currentFolderId}
-                onNavigate={setCurrentFolderId}
-                onFolderCreated={(folder) => setFolders((items) => [folder, ...items])}
-                onRenameFolder={(folder) => openRename("folder", folder)}
-                onDeleteFolder={(folder) => {
-                  setDeleteTarget({ type: "folder", item: folder });
-                }}
-                showFolders={view === "grid"}
-              />
+                {activeCategory === "all" && (
+                  <FolderGrid
+                    query={normalizedQuery}
+                    folders={folders}
+                    currentFolderId={currentFolderId}
+                    onNavigate={setCurrentFolderId}
+                    onFolderCreated={(folder) =>
+                      setFolders((items) => [folder, ...items])
+                    }
+                    onRenameFolder={(folder) => openRename("folder", folder)}
+                    onDeleteFolder={(folder) => {
+                      setDeleteTarget({ type: "folder", item: folder });
+                    }}
+                    showFolders={view === "grid"}
+                  />
+                )}
+
+                {view === "grid" ? (
+                  <>
+                    <FileGrid
+                      {...commonFileProps}
+                      folders={[]}
+                      onMoveFile={(file) => {
+                        setMoveDestination(file.folderId || "");
+                        setMoveTarget(file);
+                      }}
+                    />
+                  </>
+                ) : (
+                  <RecentFiles
+                    {...commonFileProps}
+                    onFileMoved={(fileId, folderId) =>
+                      setFiles((items) =>
+                        items
+                          .map((file) =>
+                            file.id === fileId ? { ...file, folderId } : file,
+                          )
+                          .filter(
+                            (file) =>
+                              activeCategory !== "all" ||
+                              file.folderId === currentFolderId,
+                          ),
+                      )
+                    }
+                  />
+                )}
+              </>
             )}
 
-            {view === "grid" ? (
-              <>
-                <FileGrid
-                  {...commonFileProps}
-                  folders={[]}
-                  onMoveFile={(file) => {
-                    setMoveDestination(file.folderId || "");
-                    setMoveTarget(file);
-                  }}
-                />
-              </>
-            ) : (
-              <RecentFiles
-                {...commonFileProps}
-                onFileMoved={(fileId, folderId) =>
-                  setFiles((items) =>
-                    items
-                      .map((file) => file.id === fileId ? { ...file, folderId } : file)
-                      .filter((file) => activeCategory !== "all" || file.folderId === currentFolderId),
-                  )
-                }
-              />
-            )}
-              </>
-            )}
-
-            {!filesLoading && !foldersLoading && folders.length === 0 && files.length === 0 && !searchQuery && activeCategory === "all" && (
-              <Empty className="mt-6 min-h-64 border">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon"><FolderOpen /></EmptyMedia>
-                  <EmptyTitle>Your workspace is empty</EmptyTitle>
-                  <EmptyDescription>Upload a file or create a folder to get started.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
+            {!filesLoading &&
+              !foldersLoading &&
+              folders.length === 0 &&
+              files.length === 0 &&
+              !searchQuery &&
+              activeCategory === "all" && (
+                <Empty className="mt-6 min-h-64 border">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <FolderOpen />
+                    </EmptyMedia>
+                    <EmptyTitle>Your workspace is empty</EmptyTitle>
+                    <EmptyDescription>
+                      Upload a file or create a folder to get started.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
           </div>
         </main>
       </div>
@@ -486,43 +712,197 @@ export function DashboardShell() {
           file={previewTarget}
           onClose={() => setPreviewTarget(null)}
           onShare={() => setShareTarget(previewTarget)}
-          onDownload={() => window.location.assign(`/api/file/${previewTarget.id}/download`)}
+          onDownload={() =>
+            window.location.assign(`/api/file/${previewTarget.id}/download`)
+          }
           canShare
           canDownload
         />
       )}
 
-      <Dialog open={Boolean(renameTarget)} onOpenChange={(open) => !open && !renaming && setRenameTarget(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle>Rename {renameTarget?.type}</DialogTitle><DialogDescription>Enter a new name for this {renameTarget?.type}.</DialogDescription></DialogHeader>
-          <Input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} maxLength={255} aria-label="New name" />
+      <Dialog
+        open={uploadDialogOpen}
+        onOpenChange={(open) => !open && closeFolderUpload()}
+      >
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Upload folder</DialogTitle>
+            <DialogDescription>
+              Review the folder contents before uploading. Subfolders will be
+              preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <FolderOpen className="size-4 text-muted-foreground" />
+              <span className="truncate">{folderName}</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {folderFiles.length} {folderFiles.length === 1 ? "file" : "files"}
+            </p>
+          </div>
+          {folderUploadState !== "idle" && (
+            <Progress
+              value={
+                folderFiles.length
+                  ? (folderUploadCount / folderFiles.length) * 100
+                  : 0
+              }
+            >
+              <ProgressLabel>
+                {folderUploadState === "uploading"
+                  ? "Uploading files"
+                  : folderUploadState === "complete"
+                    ? "Upload complete"
+                    : folderUploadState === "cancelled"
+                      ? "Upload cancelled"
+                      : "Upload stopped"}
+              </ProgressLabel>
+              <span className="ml-auto text-sm text-muted-foreground tabular-nums">
+                {folderUploadCount} / {folderFiles.length}
+              </span>
+            </Progress>
+          )}
+          {folderUploadError && (
+            <p className="text-sm text-destructive">{folderUploadError}</p>
+          )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setRenameTarget(null)} disabled={renaming}>Cancel</Button>
-            <Button type="button" onClick={renameItem} disabled={renaming || !renameValue.trim()}>{renaming ? "Saving..." : "Save"}</Button>
+            {folderUploadState === "uploading" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={cancelFolderUpload}
+              >
+                Cancel upload
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeFolderUpload}
+                >
+                  Close
+                </Button>
+                {folderUploadState !== "complete" && (
+                  <Button type="button" onClick={uploadFolder}>
+                    Upload folder
+                  </Button>
+                )}
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
+      <Dialog
+        open={Boolean(renameTarget)}
+        onOpenChange={(open) => !open && !renaming && setRenameTarget(null)}
+      >
         <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle>Delete {deleteTarget?.type}?</DialogTitle><DialogDescription>This action cannot be undone. {deleteTarget?.type === "folder" && "Folders must be empty before they can be deleted."}</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Rename {renameTarget?.type}</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this {renameTarget?.type}.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            maxLength={255}
+            aria-label="New name"
+          />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
-            <Button type="button" variant="destructive" onClick={deleteItem} disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRenameTarget(null)}
+              disabled={renaming}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={renameItem}
+              disabled={renaming || !renameValue.trim()}
+            >
+              {renaming ? "Saving..." : "Save"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(moveTarget)} onOpenChange={(open) => !open && !moving && setMoveTarget(null)}>
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}
+      >
         <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle>Move file</DialogTitle><DialogDescription>Choose a destination for {moveTarget?.name}.</DialogDescription></DialogHeader>
-          <select value={moveDestination} onChange={(event) => setMoveDestination(event.target.value)} className="rounded-lg border border-[#d0d5dd] bg-white px-3 py-2.5 text-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.type}?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone.{" "}
+              {deleteTarget?.type === "folder" &&
+                "Folders must be empty before they can be deleted."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={deleteItem}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(moveTarget)}
+        onOpenChange={(open) => !open && !moving && setMoveTarget(null)}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Move file</DialogTitle>
+            <DialogDescription>
+              Choose a destination for {moveTarget?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <select
+            value={moveDestination}
+            onChange={(event) => setMoveDestination(event.target.value)}
+            className="rounded-lg border border-[#d0d5dd] bg-white px-3 py-2.5 text-sm"
+          >
             <option value="">My Files</option>
-            {folders.filter((folder) => folder.id !== moveTarget?.folderId).map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+            {folders
+              .filter((folder) => folder.id !== moveTarget?.folderId)
+              .map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
           </select>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setMoveTarget(null)} disabled={moving}>Cancel</Button>
-            <Button type="button" onClick={moveFile} disabled={moving}>{moving ? "Moving..." : "Move file"}</Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMoveTarget(null)}
+              disabled={moving}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={moveFile} disabled={moving}>
+              {moving ? "Moving..." : "Move file"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

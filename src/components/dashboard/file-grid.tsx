@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, FolderInput } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -43,7 +43,10 @@ export function DashboardHeader({
         </div>
         <div className="flex items-center gap-3 sm:gap-5">
           <label className="relative hidden w-[min(34vw,360px)] sm:block">
-            <Search data-icon="inline-start" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              data-icon="inline-start"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}

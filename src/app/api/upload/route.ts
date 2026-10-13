@@ -13,6 +13,35 @@ import { getS3Bucket, getS3Client } from "@/lib/s3";
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB per file
 
+async function findOrCreateFolderPath(
+  userId: string,
+  parentId: string | null,
+  relativePath: string,
+) {
+  let currentParentId = parentId;
+  const segments = relativePath
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => Boolean(segment) && segment !== "." && segment !== "..")
+    .slice(0, 50);
+
+  for (const name of segments) {
+    let folder = await prisma.folder.findFirst({
+      where: { ownerId: userId, parentId: currentParentId, name },
+      select: { id: true },
+    });
+    if (!folder) {
+      folder = await prisma.folder.create({
+        data: { name, ownerId: userId, parentId: currentParentId },
+        select: { id: true },
+      });
+    }
+    currentParentId = folder.id;
+  }
+
+  return currentParentId;
+}
+
 export async function POST(req: NextRequest) {
   let storageKey: string | null = null;
   let s3Client: ReturnType<typeof getS3Client> | null = null;
@@ -88,10 +117,13 @@ export async function POST(req: NextRequest) {
 
     // 4. Validate destination folder ownership
     const folderIdValue = formData.get("folderId");
-    const folderId =
+    let folderId =
       typeof folderIdValue === "string" && folderIdValue.trim()
         ? folderIdValue.trim()
         : null;
+    const relativePathValue = formData.get("relativePath");
+    const relativePath =
+      typeof relativePathValue === "string" ? relativePathValue : "";
 
     if (folderId) {
       const folder = await prisma.folder.findFirst({
@@ -106,6 +138,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { success: false, error: "Folder not found" },
           { status: 404 }
+        );
+      }
+    }
+
+    if (relativePath) {
+      const pathSegments = relativePath
+        .replace(/\\/g, "/")
+        .split("/")
+        .map((segment) => segment.trim())
+        .filter((segment) => Boolean(segment) && segment !== "." && segment !== "..");
+      const directoryPath = pathSegments.slice(0, -1).join("/");
+      if (directoryPath) {
+        folderId = await findOrCreateFolderPath(
+          userId,
+          folderId,
+          directoryPath,
         );
       }
     }

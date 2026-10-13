@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
+import { Button } from "../ui/button";
 
 export type FolderItem = {
   id: string;
@@ -162,16 +163,18 @@ export function FolderGrid({
               ))}
             </nav>
           </div>
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => {
               setFolderName("");
               setIsCreateOpen(true);
             }}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#246bfe] px-3.5 py-2 text-sm font-medium text-white shadow-[0_5px_12px_rgba(36,107,254,0.2)] transition hover:bg-[#155eef]"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium"
           >
-            <Plus className="size-4" /> New Folder
-          </button>
+            <Plus className="size-4" />
+            New Folder
+          </Button>
         </div>
 
         {showFolders && visibleFolders.length > 0 ? (
