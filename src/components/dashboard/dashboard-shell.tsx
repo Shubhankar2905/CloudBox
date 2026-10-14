@@ -76,14 +76,29 @@ export function DashboardShell() {
   const [folderFiles, setFolderFiles] = useState<File[]>([]);
   const [folderName, setFolderName] = useState("");
   const [folderUploadState, setFolderUploadState] = useState<
-    "idle" | "uploading" | "complete" | "error" | "cancelled"
+    "idle" | "uploading" | "retrying" | "completing" | "complete" | "error" | "cancelled"
   >("idle");
   const [folderUploadCount, setFolderUploadCount] = useState(0);
+  const [folderFileProgress, setFolderFileProgress] = useState<Record<string, number>>({});
   const [folderUploadError, setFolderUploadError] = useState("");
+  const [largeFileUpload, setLargeFileUpload] = useState<{
+    fileName: string;
+    progress: number;
+    status:
+      | "uploading"
+      | "retrying"
+      | "completing"
+      | "completed"
+      | "failed"
+      | "cancelled";
+  } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const uploadRequestRef = useRef<XMLHttpRequest | null>(null);
+  const uploadRequestsRef = useRef<Set<XMLHttpRequest>>(new Set());
+  const activeMultipartUploadsRef = useRef(
+    new Set<{ fileId: string; uploadId: string }>(),
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -174,6 +189,38 @@ export function DashboardShell() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      if (file.size > 100 * 1024 * 1024) {
+        setLargeFileUpload({
+          fileName: file.name,
+          progress: 0,
+          status: "uploading",
+        });
+        await uploadLargeFile(file, undefined, (progress) =>
+          setLargeFileUpload((current) =>
+            current ? { ...current, progress } : current,
+          ),
+          (status) =>
+            setLargeFileUpload((current) =>
+              current
+                ? {
+                    ...current,
+                    status,
+                  }
+                : current,
+            ),
+        );
+        setLargeFileUpload((current) =>
+          current ? { ...current, progress: 100, status: "completed" } : current,
+        );
+        setRefreshKey((value) => value + 1);
+        toast.add({
+          id: "dashboard-upload",
+          type: "success",
+          title: "File uploaded",
+          description: `${file.name} was uploaded successfully.`,
+        });
+        return;
+      }
       const formData = new FormData();
       formData.append("file", file);
       if (currentFolderId) formData.append("folderId", currentFolderId);
@@ -211,6 +258,19 @@ export function DashboardShell() {
         description: `${file.name} was uploaded successfully.`,
       });
     } catch (error) {
+      if (file.size > 100 * 1024 * 1024) {
+        setLargeFileUpload((current) =>
+          current
+            ? {
+                ...current,
+                status:
+                  error instanceof DOMException && error.name === "AbortError"
+                    ? "cancelled"
+                    : "failed",
+              }
+            : current,
+        );
+      }
       console.error("Upload error:", error);
       toast.add({
         id: "dashboard-upload",
@@ -223,6 +283,159 @@ export function DashboardShell() {
     }
   }
 
+  async function uploadLargeFile(
+    file: File,
+    relativePath?: string,
+    onProgress?: (progress: number) => void,
+    onStatus?: (status: "uploading" | "retrying" | "completing") => void,
+  ) {
+    const initiateResponse = await fetch("/api/uploads/initiate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        folderId: currentFolderId,
+        relativePath,
+      }),
+    });
+    const initiateData = await initiateResponse.json();
+    if (!initiateResponse.ok) {
+      throw new Error(initiateData.message || initiateData.error || "Unable to start upload");
+    }
+
+    const upload = {
+      fileId: initiateData.fileId as string,
+      uploadId: initiateData.uploadId as string,
+      partSize: initiateData.partSize as number,
+      totalParts: initiateData.totalParts as number,
+    };
+    activeMultipartUploadsRef.current.add({
+      fileId: upload.fileId,
+      uploadId: upload.uploadId,
+    });
+
+    const progressByPart = new Map<number, number>();
+    const parts: { PartNumber: number; ETag: string }[] = [];
+    const getPart = async (partNumber: number) => {
+      const start = (partNumber - 1) * upload.partSize;
+      const end = Math.min(start + upload.partSize, file.size);
+      const part = file.slice(start, end);
+      let lastError: unknown;
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const urlResponse = await fetch("/api/uploads/parts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileId: upload.fileId,
+              uploadId: upload.uploadId,
+              partNumber,
+            }),
+          });
+          const urlData = await urlResponse.json();
+          if (!urlResponse.ok) throw new Error(urlData.error || "Unable to sign part");
+
+          const etag = await new Promise<string>((resolve, reject) => {
+            const request = new XMLHttpRequest();
+            uploadRequestsRef.current.add(request);
+            request.open("PUT", urlData.url);
+            request.upload.onprogress = (event) => {
+              if (!event.lengthComputable) return;
+              progressByPart.set(partNumber, event.loaded);
+              const uploaded = Array.from(progressByPart.values()).reduce(
+                (total, value) => total + value,
+                0,
+              );
+              onProgress?.(Math.min(100, (uploaded / file.size) * 100));
+            };
+            request.onload = () => {
+              uploadRequestsRef.current.delete(request);
+              if (request.status >= 200 && request.status < 300) {
+                resolve(request.getResponseHeader("ETag") || "");
+              } else {
+                reject(new Error(`Part ${partNumber} failed (${request.status})`));
+              }
+            };
+            request.onerror = () => {
+              uploadRequestsRef.current.delete(request);
+              reject(new Error(`Part ${partNumber} failed`));
+            };
+            request.onabort = () => {
+              uploadRequestsRef.current.delete(request);
+              reject(new DOMException("Upload cancelled", "AbortError"));
+            };
+            request.send(part);
+          });
+          if (!etag) throw new Error("S3 did not return an ETag");
+          parts.push({ PartNumber: partNumber, ETag: etag });
+          return;
+        } catch (error) {
+          lastError = error;
+          if (error instanceof DOMException && error.name === "AbortError") throw error;
+          if (attempt < 2) {
+            onStatus?.("retrying");
+            await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+          }
+        }
+      }
+      throw lastError instanceof Error ? lastError : new Error("Part upload failed");
+    };
+
+    try {
+      let nextPart = 1;
+      const worker = async () => {
+        while (nextPart <= upload.totalParts) {
+          const partNumber = nextPart;
+          nextPart += 1;
+          await getPart(partNumber);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, upload.totalParts) }, worker));
+      parts.sort((a, b) => a.PartNumber - b.PartNumber);
+      onStatus?.("completing");
+
+      const completeResponse = await fetch("/api/uploads/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileId: upload.fileId,
+          uploadId: upload.uploadId,
+          parts,
+          relativePath,
+        }),
+      });
+      const completeData = await completeResponse.json();
+      if (!completeResponse.ok) {
+        throw new Error(completeData.error || "Unable to complete upload");
+      }
+      onProgress?.(100);
+      return completeData.file;
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        await fetch("/api/uploads/abort", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileId: upload.fileId,
+            uploadId: upload.uploadId,
+          }),
+        }).catch((abortError) => {
+          console.error("Failed to abort multipart upload:", abortError);
+        });
+      }
+      throw error;
+    } finally {
+      const activeUpload = Array.from(activeMultipartUploadsRef.current).find(
+        (item) =>
+          item.fileId === upload.fileId && item.uploadId === upload.uploadId,
+      );
+      if (activeUpload) activeMultipartUploadsRef.current.delete(activeUpload);
+    }
+  }
+
   function handleFolderSelection(event: React.ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(event.target.files || []);
     event.target.value = "";
@@ -232,36 +445,38 @@ export function DashboardShell() {
     setFolderName(firstPath?.split("/")[0] || "Selected folder");
     setFolderFiles(selectedFiles);
     setFolderUploadCount(0);
+    setFolderFileProgress({});
     setFolderUploadError("");
     setFolderUploadState("idle");
     setUploadDialogOpen(true);
   }
 
-  function uploadFolderFile(file: File) {
+  async function uploadFolderFile(file: File) {
+    const fileKey = file.webkitRelativePath || file.name;
+    const updateProgress = (progress: number) =>
+      setFolderFileProgress((current) => ({ ...current, [fileKey]: progress }));
+    updateProgress(0);
+    if (file.size > 100 * 1024 * 1024) {
+      await uploadLargeFile(file, file.webkitRelativePath, updateProgress, (status) =>
+        setFolderUploadState(status),
+      );
+      return;
+    }
+
     return new Promise<void>((resolve, reject) => {
-      const request = new XMLHttpRequest();
-      uploadRequestRef.current = request;
-      request.open("POST", "/api/upload");
-      request.onload = () => {
-        uploadRequestRef.current = null;
-        if (request.status >= 200 && request.status < 300) resolve();
-        else reject(new Error("Upload failed"));
-      };
-      request.onerror = () => {
-        uploadRequestRef.current = null;
-        reject(new Error("Network error"));
-      };
-      request.onabort = () => {
-        uploadRequestRef.current = null;
-        reject(new DOMException("Upload cancelled", "AbortError"));
-      };
       const formData = new FormData();
       formData.append("file", file);
       if (currentFolderId) formData.append("folderId", currentFolderId);
       if (file.webkitRelativePath) {
         formData.append("relativePath", file.webkitRelativePath);
       }
-      request.send(formData);
+      fetch("/api/upload", { method: "POST", body: formData })
+        .then(async (response) => {
+          if (!response.ok) throw new Error((await response.json()).error || "Upload failed");
+          updateProgress(100);
+          resolve();
+        })
+        .catch(reject);
     });
   }
 
@@ -273,6 +488,7 @@ export function DashboardShell() {
 
     try {
       for (let index = 0; index < folderFiles.length; index += 1) {
+        setFolderUploadState("uploading");
         await uploadFolderFile(folderFiles[index]);
         setFolderUploadCount(index + 1);
       }
@@ -304,7 +520,14 @@ export function DashboardShell() {
   }
 
   function cancelFolderUpload() {
-    uploadRequestRef.current?.abort();
+    uploadRequestsRef.current.forEach((request) => request.abort());
+    activeMultipartUploadsRef.current.forEach((upload) => {
+      fetch("/api/uploads/abort", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(upload),
+      }).catch((error) => console.error("Failed to abort upload:", error));
+    });
   }
 
   function closeFolderUpload() {
@@ -721,6 +944,60 @@ export function DashboardShell() {
       )}
 
       <Dialog
+        open={Boolean(largeFileUpload)}
+        onOpenChange={(open) => {
+          if (
+            !open &&
+            !["uploading", "retrying", "completing"].includes(
+              largeFileUpload?.status ?? "",
+            )
+          ) {
+            setLargeFileUpload(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Uploading large file</DialogTitle>
+            <DialogDescription className="truncate">
+              {largeFileUpload?.fileName}
+            </DialogDescription>
+          </DialogHeader>
+          <Progress value={largeFileUpload?.progress ?? 0}>
+            <ProgressLabel>
+              {largeFileUpload?.status === "uploading"
+                ? "Uploading"
+                : largeFileUpload?.status === "retrying"
+                  ? "Retrying"
+                  : largeFileUpload?.status === "completing"
+                    ? "Completing"
+                : largeFileUpload?.status === "completed"
+                  ? "Completed"
+                  : largeFileUpload?.status === "cancelled"
+                    ? "Cancelled"
+                    : "Failed"}
+            </ProgressLabel>
+            <span className="ml-auto text-sm text-muted-foreground tabular-nums">
+              {Math.round(largeFileUpload?.progress ?? 0)}%
+            </span>
+          </Progress>
+          <DialogFooter>
+            {largeFileUpload?.status === "uploading" ||
+            largeFileUpload?.status === "retrying" ||
+            largeFileUpload?.status === "completing" ? (
+              <Button type="button" variant="outline" onClick={cancelFolderUpload}>
+                Cancel upload
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => setLargeFileUpload(null)}>
+                Close
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={uploadDialogOpen}
         onOpenChange={(open) => !open && closeFolderUpload()}
       >
@@ -752,6 +1029,10 @@ export function DashboardShell() {
               <ProgressLabel>
                 {folderUploadState === "uploading"
                   ? "Uploading files"
+                  : folderUploadState === "retrying"
+                    ? "Retrying"
+                    : folderUploadState === "completing"
+                      ? "Completing"
                   : folderUploadState === "complete"
                     ? "Upload complete"
                     : folderUploadState === "cancelled"
@@ -766,8 +1047,29 @@ export function DashboardShell() {
           {folderUploadError && (
             <p className="text-sm text-destructive">{folderUploadError}</p>
           )}
+          {folderFiles.length > 0 && (
+            <div className="max-h-40 space-y-2 overflow-y-auto">
+              {folderFiles.map((file) => {
+                const key = file.webkitRelativePath || file.name;
+                const progress = folderFileProgress[key] ?? 0;
+                return (
+                  <div key={key} className="space-y-1">
+                    <div className="flex justify-between gap-3 text-xs">
+                      <span className="truncate">{key}</span>
+                      <span className="text-muted-foreground">
+                        {Math.round(progress)}%
+                      </span>
+                    </div>
+                    <Progress value={progress} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <DialogFooter>
-            {folderUploadState === "uploading" ? (
+            {folderUploadState === "uploading" ||
+            folderUploadState === "retrying" ||
+            folderUploadState === "completing" ? (
               <Button
                 type="button"
                 variant="outline"

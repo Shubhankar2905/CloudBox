@@ -61,3 +61,8 @@ export type Folder = Prisma.FolderModel
  * 
  */
 export type SharedLink = Prisma.SharedLinkModel
+/**
+ * Model MultipartUpload
+ * 
+ */
+export type MultipartUpload = Prisma.MultipartUploadModel

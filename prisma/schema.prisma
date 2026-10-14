@@ -74,3 +74,21 @@ model SharedLink {
   @@index([fileId])
   @@index([createdById])
 }
+
+model MultipartUpload {
+  id              String   @id @default(cuid())
+  userId          String
+  fileName        String
+  fileSize        BigInt
+  mimeType        String
+  storageKey      String   @unique
+  uploadId        String   @unique
+  partSize        Int
+  folderId        String?
+  status          String   @default("initiated")
+  completedFileId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, status])
+}

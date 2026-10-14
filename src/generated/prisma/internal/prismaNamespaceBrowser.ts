@@ -54,7 +54,8 @@ export const ModelName = {
   User: 'User',
   File: 'File',
   Folder: 'Folder',
-  SharedLink: 'SharedLink'
+  SharedLink: 'SharedLink',
+  MultipartUpload: 'MultipartUpload'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -125,6 +126,25 @@ export const SharedLinkScalarFieldEnum = {
 } as const
 
 export type SharedLinkScalarFieldEnum = (typeof SharedLinkScalarFieldEnum)[keyof typeof SharedLinkScalarFieldEnum]
+
+
+export const MultipartUploadScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fileName: 'fileName',
+  fileSize: 'fileSize',
+  mimeType: 'mimeType',
+  storageKey: 'storageKey',
+  uploadId: 'uploadId',
+  partSize: 'partSize',
+  folderId: 'folderId',
+  status: 'status',
+  completedFileId: 'completedFileId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MultipartUploadScalarFieldEnum = (typeof MultipartUploadScalarFieldEnum)[keyof typeof MultipartUploadScalarFieldEnum]
 
 
 export const SortOrder = {

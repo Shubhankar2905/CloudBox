@@ -400,7 +400,8 @@ export const ModelName = {
   User: 'User',
   File: 'File',
   Folder: 'Folder',
-  SharedLink: 'SharedLink'
+  SharedLink: 'SharedLink',
+  MultipartUpload: 'MultipartUpload'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -416,7 +417,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "file" | "folder" | "sharedLink"
+    modelProps: "user" | "file" | "folder" | "sharedLink" | "multipartUpload"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -716,6 +717,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    MultipartUpload: {
+      payload: Prisma.$MultipartUploadPayload<ExtArgs>
+      fields: Prisma.MultipartUploadFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MultipartUploadFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MultipartUploadFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>
+        }
+        findFirst: {
+          args: Prisma.MultipartUploadFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MultipartUploadFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>
+        }
+        findMany: {
+          args: Prisma.MultipartUploadFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>[]
+        }
+        create: {
+          args: Prisma.MultipartUploadCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>
+        }
+        createMany: {
+          args: Prisma.MultipartUploadCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MultipartUploadCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>[]
+        }
+        delete: {
+          args: Prisma.MultipartUploadDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>
+        }
+        update: {
+          args: Prisma.MultipartUploadUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>
+        }
+        deleteMany: {
+          args: Prisma.MultipartUploadDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MultipartUploadUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MultipartUploadUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>[]
+        }
+        upsert: {
+          args: Prisma.MultipartUploadUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MultipartUploadPayload>
+        }
+        aggregate: {
+          args: Prisma.MultipartUploadAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMultipartUpload>
+        }
+        groupBy: {
+          args: Prisma.MultipartUploadGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MultipartUploadGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MultipartUploadCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MultipartUploadCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -807,6 +882,25 @@ export const SharedLinkScalarFieldEnum = {
 } as const
 
 export type SharedLinkScalarFieldEnum = (typeof SharedLinkScalarFieldEnum)[keyof typeof SharedLinkScalarFieldEnum]
+
+
+export const MultipartUploadScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fileName: 'fileName',
+  fileSize: 'fileSize',
+  mimeType: 'mimeType',
+  storageKey: 'storageKey',
+  uploadId: 'uploadId',
+  partSize: 'partSize',
+  folderId: 'folderId',
+  status: 'status',
+  completedFileId: 'completedFileId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MultipartUploadScalarFieldEnum = (typeof MultipartUploadScalarFieldEnum)[keyof typeof MultipartUploadScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1070,6 +1164,7 @@ export type GlobalOmitConfig = {
   file?: Prisma.FileOmit
   folder?: Prisma.FolderOmit
   sharedLink?: Prisma.SharedLinkOmit
+  multipartUpload?: Prisma.MultipartUploadOmit
 }
 
 /* Types for Logging */
