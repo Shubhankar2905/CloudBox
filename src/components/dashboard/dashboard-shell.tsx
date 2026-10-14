@@ -46,12 +46,22 @@ import {
 import { Progress, ProgressLabel } from "@/components/ui/progress";
 import { toast } from "@/components/ui/toast";
 import { getFileCategory, type FileCategory } from "@/lib/file-category";
+import {
+  DownloadManager,
+  useDownloadManager,
+} from "@/components/dashboard/download-manager";
+import {
+  UploadManager,
+  useUploadManager,
+} from "@/components/dashboard/upload-manager";
 
 type RenameTarget =
   | { type: "file"; item: FileItem }
   | { type: "folder"; item: FolderItem };
 
 export function DashboardShell() {
+  const { downloads, startDownload, pauseDownload, cancelDownload } =
+    useDownloadManager();
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [username, setUsername] = useState("Loading...");
@@ -81,23 +91,17 @@ export function DashboardShell() {
   const [folderUploadCount, setFolderUploadCount] = useState(0);
   const [folderFileProgress, setFolderFileProgress] = useState<Record<string, number>>({});
   const [folderUploadError, setFolderUploadError] = useState("");
-  const [largeFileUpload, setLargeFileUpload] = useState<{
-    fileName: string;
-    progress: number;
-    status:
-      | "uploading"
-      | "retrying"
-      | "completing"
-      | "completed"
-      | "failed"
-      | "cancelled";
-  } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const uploadRequestsRef = useRef<Set<XMLHttpRequest>>(new Set());
-  const activeMultipartUploadsRef = useRef(
-    new Set<{ fileId: string; uploadId: string }>(),
+  const {
+    items: uploadItems,
+    start: startUpload,
+    pause: pauseUpload,
+    cancel: cancelUpload,
+    retry: retryUpload,
+  } = useUploadManager(currentFolderId, () =>
+    setRefreshKey((value) => value + 1),
   );
 
   useEffect(() => {
@@ -186,254 +190,11 @@ export function DashboardShell() {
   }, [refreshKey]);
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      if (file.size > 100 * 1024 * 1024) {
-        setLargeFileUpload({
-          fileName: file.name,
-          progress: 0,
-          status: "uploading",
-        });
-        await uploadLargeFile(file, undefined, (progress) =>
-          setLargeFileUpload((current) =>
-            current ? { ...current, progress } : current,
-          ),
-          (status) =>
-            setLargeFileUpload((current) =>
-              current
-                ? {
-                    ...current,
-                    status,
-                  }
-                : current,
-            ),
-        );
-        setLargeFileUpload((current) =>
-          current ? { ...current, progress: 100, status: "completed" } : current,
-        );
-        setRefreshKey((value) => value + 1);
-        toast.add({
-          id: "dashboard-upload",
-          type: "success",
-          title: "File uploaded",
-          description: `${file.name} was uploaded successfully.`,
-        });
-        return;
-      }
-      const formData = new FormData();
-      formData.append("file", file);
-      if (currentFolderId) formData.append("folderId", currentFolderId);
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        console.error("Upload failed:", data.error);
-        toast.add({
-          id: "dashboard-upload",
-          type: "error",
-          title: "Upload failed",
-          description: data.message || data.error || "Please try again.",
-        });
-        return;
-      }
-      setFiles((currentFiles) => [
-        {
-          id: data.file.id,
-          name: data.file.name,
-          size: data.file.size,
-          mimeType: data.file.mimeType,
-          createdAt: data.file.createdAt,
-          folderId: data.file.folderId,
-        },
-        ...currentFiles,
-      ]);
-      setRefreshKey((value) => value + 1);
-      toast.add({
-        id: "dashboard-upload",
-        type: "success",
-        title: "File uploaded",
-        description: `${file.name} was uploaded successfully.`,
-      });
-    } catch (error) {
-      if (file.size > 100 * 1024 * 1024) {
-        setLargeFileUpload((current) =>
-          current
-            ? {
-                ...current,
-                status:
-                  error instanceof DOMException && error.name === "AbortError"
-                    ? "cancelled"
-                    : "failed",
-              }
-            : current,
-        );
-      }
-      console.error("Upload error:", error);
-      toast.add({
-        id: "dashboard-upload",
-        type: "error",
-        title: "Upload failed",
-        description: "Something went wrong while uploading the file.",
-      });
-    } finally {
-      event.target.value = "";
-    }
-  }
-
-  async function uploadLargeFile(
-    file: File,
-    relativePath?: string,
-    onProgress?: (progress: number) => void,
-    onStatus?: (status: "uploading" | "retrying" | "completing") => void,
-  ) {
-    const initiateResponse = await fetch("/api/uploads/initiate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type || "application/octet-stream",
-        folderId: currentFolderId,
-        relativePath,
-      }),
-    });
-    const initiateData = await initiateResponse.json();
-    if (!initiateResponse.ok) {
-      throw new Error(initiateData.message || initiateData.error || "Unable to start upload");
-    }
-
-    const upload = {
-      fileId: initiateData.fileId as string,
-      uploadId: initiateData.uploadId as string,
-      partSize: initiateData.partSize as number,
-      totalParts: initiateData.totalParts as number,
-    };
-    activeMultipartUploadsRef.current.add({
-      fileId: upload.fileId,
-      uploadId: upload.uploadId,
-    });
-
-    const progressByPart = new Map<number, number>();
-    const parts: { PartNumber: number; ETag: string }[] = [];
-    const getPart = async (partNumber: number) => {
-      const start = (partNumber - 1) * upload.partSize;
-      const end = Math.min(start + upload.partSize, file.size);
-      const part = file.slice(start, end);
-      let lastError: unknown;
-
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          const urlResponse = await fetch("/api/uploads/parts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileId: upload.fileId,
-              uploadId: upload.uploadId,
-              partNumber,
-            }),
-          });
-          const urlData = await urlResponse.json();
-          if (!urlResponse.ok) throw new Error(urlData.error || "Unable to sign part");
-
-          const etag = await new Promise<string>((resolve, reject) => {
-            const request = new XMLHttpRequest();
-            uploadRequestsRef.current.add(request);
-            request.open("PUT", urlData.url);
-            request.upload.onprogress = (event) => {
-              if (!event.lengthComputable) return;
-              progressByPart.set(partNumber, event.loaded);
-              const uploaded = Array.from(progressByPart.values()).reduce(
-                (total, value) => total + value,
-                0,
-              );
-              onProgress?.(Math.min(100, (uploaded / file.size) * 100));
-            };
-            request.onload = () => {
-              uploadRequestsRef.current.delete(request);
-              if (request.status >= 200 && request.status < 300) {
-                resolve(request.getResponseHeader("ETag") || "");
-              } else {
-                reject(new Error(`Part ${partNumber} failed (${request.status})`));
-              }
-            };
-            request.onerror = () => {
-              uploadRequestsRef.current.delete(request);
-              reject(new Error(`Part ${partNumber} failed`));
-            };
-            request.onabort = () => {
-              uploadRequestsRef.current.delete(request);
-              reject(new DOMException("Upload cancelled", "AbortError"));
-            };
-            request.send(part);
-          });
-          if (!etag) throw new Error("S3 did not return an ETag");
-          parts.push({ PartNumber: partNumber, ETag: etag });
-          return;
-        } catch (error) {
-          lastError = error;
-          if (error instanceof DOMException && error.name === "AbortError") throw error;
-          if (attempt < 2) {
-            onStatus?.("retrying");
-            await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
-          }
-        }
-      }
-      throw lastError instanceof Error ? lastError : new Error("Part upload failed");
-    };
-
-    try {
-      let nextPart = 1;
-      const worker = async () => {
-        while (nextPart <= upload.totalParts) {
-          const partNumber = nextPart;
-          nextPart += 1;
-          await getPart(partNumber);
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(4, upload.totalParts) }, worker));
-      parts.sort((a, b) => a.PartNumber - b.PartNumber);
-      onStatus?.("completing");
-
-      const completeResponse = await fetch("/api/uploads/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileId: upload.fileId,
-          uploadId: upload.uploadId,
-          parts,
-          relativePath,
-        }),
-      });
-      const completeData = await completeResponse.json();
-      if (!completeResponse.ok) {
-        throw new Error(completeData.error || "Unable to complete upload");
-      }
-      onProgress?.(100);
-      return completeData.file;
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        await fetch("/api/uploads/abort", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileId: upload.fileId,
-            uploadId: upload.uploadId,
-          }),
-        }).catch((abortError) => {
-          console.error("Failed to abort multipart upload:", abortError);
-        });
-      }
-      throw error;
-    } finally {
-      const activeUpload = Array.from(activeMultipartUploadsRef.current).find(
-        (item) =>
-          item.fileId === upload.fileId && item.uploadId === upload.uploadId,
-      );
-      if (activeUpload) activeMultipartUploadsRef.current.delete(activeUpload);
-    }
+    const selectedFiles = Array.from(event.target.files || []);
+    event.target.value = "";
+    await Promise.all(
+      selectedFiles.map((file) => startUpload(file)),
+    );
   }
 
   function handleFolderSelection(event: React.ChangeEvent<HTMLInputElement>) {
@@ -451,35 +212,6 @@ export function DashboardShell() {
     setUploadDialogOpen(true);
   }
 
-  async function uploadFolderFile(file: File) {
-    const fileKey = file.webkitRelativePath || file.name;
-    const updateProgress = (progress: number) =>
-      setFolderFileProgress((current) => ({ ...current, [fileKey]: progress }));
-    updateProgress(0);
-    if (file.size > 100 * 1024 * 1024) {
-      await uploadLargeFile(file, file.webkitRelativePath, updateProgress, (status) =>
-        setFolderUploadState(status),
-      );
-      return;
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      if (currentFolderId) formData.append("folderId", currentFolderId);
-      if (file.webkitRelativePath) {
-        formData.append("relativePath", file.webkitRelativePath);
-      }
-      fetch("/api/upload", { method: "POST", body: formData })
-        .then(async (response) => {
-          if (!response.ok) throw new Error((await response.json()).error || "Upload failed");
-          updateProgress(100);
-          resolve();
-        })
-        .catch(reject);
-    });
-  }
-
   async function uploadFolder() {
     if (!folderFiles.length || folderUploadState === "uploading") return;
     setFolderUploadState("uploading");
@@ -487,47 +219,29 @@ export function DashboardShell() {
     setFolderUploadError("");
 
     try {
-      for (let index = 0; index < folderFiles.length; index += 1) {
-        setFolderUploadState("uploading");
-        await uploadFolderFile(folderFiles[index]);
-        setFolderUploadCount(index + 1);
-      }
+      await Promise.all(
+        folderFiles.map((file) =>
+          startUpload(file, file.webkitRelativePath || file.name),
+        ),
+      );
       setFolderUploadState("complete");
-      setRefreshKey((value) => value + 1);
-      toast.add({
-        id: "dashboard-folder-upload",
-        type: "success",
-        title: "Folder uploaded",
-        description: `${folderFiles.length} files were uploaded successfully.`,
-      });
+      setUploadDialogOpen(false);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        setFolderUploadState("cancelled");
-        return;
-      }
       console.error("Folder upload error:", error);
       setFolderUploadState("error");
       setFolderUploadError(
         "Some files could not be uploaded. Please try again.",
       );
-      toast.add({
-        id: "dashboard-folder-upload",
-        type: "error",
-        title: "Folder upload failed",
-        description: "Some files could not be uploaded.",
-      });
     }
   }
 
   function cancelFolderUpload() {
-    uploadRequestsRef.current.forEach((request) => request.abort());
-    activeMultipartUploadsRef.current.forEach((upload) => {
-      fetch("/api/uploads/abort", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(upload),
-      }).catch((error) => console.error("Failed to abort upload:", error));
-    });
+    uploadItems
+      .filter((item) =>
+        item.relativePath?.startsWith(`${folderName}/`),
+      )
+      .forEach((item) => cancelUpload(item.id));
+    setFolderUploadState("cancelled");
   }
 
   function closeFolderUpload() {
@@ -748,6 +462,7 @@ export function DashboardShell() {
     onRenameFile: (file: FileItem) => openRename("file", file),
     onShareFile: (file: FileItem) => setShareTarget(file),
     onPreviewFile: (file: FileItem) => setPreviewTarget(file),
+    onDownloadFile: startDownload,
     onDeleteFile: (file: FileItem) => {
       setDeleteTarget({ type: "file", item: file });
     },
@@ -818,6 +533,7 @@ export function DashboardShell() {
                   ref={fileInputRef}
                   type="file"
                   className="sr-only"
+                  multiple
                   onChange={handleFileUpload}
                 />
                 <input
@@ -896,6 +612,7 @@ export function DashboardShell() {
                           ),
                       )
                     }
+                    onDownloadFile={startDownload}
                   />
                 )}
               </>
@@ -930,72 +647,31 @@ export function DashboardShell() {
           onOpenChange={(open) => !open && setShareTarget(null)}
         />
       )}
+      <DownloadManager
+        downloads={downloads}
+        onPause={pauseDownload}
+        onResume={startDownload}
+        onCancel={cancelDownload}
+      />
+      <UploadManager
+        items={uploadItems}
+        onPause={pauseUpload}
+        onResume={retryUpload}
+        onRetry={retryUpload}
+        onCancel={cancelUpload}
+      />
       {previewTarget && (
         <FilePreviewModal
           file={previewTarget}
           onClose={() => setPreviewTarget(null)}
           onShare={() => setShareTarget(previewTarget)}
           onDownload={() =>
-            window.location.assign(`/api/file/${previewTarget.id}/download`)
+            startDownload(previewTarget)
           }
           canShare
           canDownload
         />
       )}
-
-      <Dialog
-        open={Boolean(largeFileUpload)}
-        onOpenChange={(open) => {
-          if (
-            !open &&
-            !["uploading", "retrying", "completing"].includes(
-              largeFileUpload?.status ?? "",
-            )
-          ) {
-            setLargeFileUpload(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-[460px]">
-          <DialogHeader>
-            <DialogTitle>Uploading large file</DialogTitle>
-            <DialogDescription className="truncate">
-              {largeFileUpload?.fileName}
-            </DialogDescription>
-          </DialogHeader>
-          <Progress value={largeFileUpload?.progress ?? 0}>
-            <ProgressLabel>
-              {largeFileUpload?.status === "uploading"
-                ? "Uploading"
-                : largeFileUpload?.status === "retrying"
-                  ? "Retrying"
-                  : largeFileUpload?.status === "completing"
-                    ? "Completing"
-                : largeFileUpload?.status === "completed"
-                  ? "Completed"
-                  : largeFileUpload?.status === "cancelled"
-                    ? "Cancelled"
-                    : "Failed"}
-            </ProgressLabel>
-            <span className="ml-auto text-sm text-muted-foreground tabular-nums">
-              {Math.round(largeFileUpload?.progress ?? 0)}%
-            </span>
-          </Progress>
-          <DialogFooter>
-            {largeFileUpload?.status === "uploading" ||
-            largeFileUpload?.status === "retrying" ||
-            largeFileUpload?.status === "completing" ? (
-              <Button type="button" variant="outline" onClick={cancelFolderUpload}>
-                Cancel upload
-              </Button>
-            ) : (
-              <Button type="button" onClick={() => setLargeFileUpload(null)}>
-                Close
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={uploadDialogOpen}

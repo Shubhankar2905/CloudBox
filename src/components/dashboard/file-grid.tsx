@@ -29,6 +29,7 @@ type FileGridProps = {
   onDeleteFile: (file: FileItem) => void;
   onRenameFolder: (folder: FolderItem) => void;
   onDeleteFolder: (folder: FolderItem) => void;
+  onDownloadFile: (file: FileItem) => void;
 };
 
 export function FileGrid({
@@ -43,6 +44,7 @@ export function FileGrid({
   onDeleteFile,
   onRenameFolder,
   onDeleteFolder,
+  onDownloadFile,
 }: FileGridProps) {
   const visibleFolders = folders.filter((folder) =>
     folder.name.toLowerCase().includes(query),
@@ -165,9 +167,7 @@ export function FileGrid({
                         <MoreHorizontal className="size-[18px]" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          render={<a href={`/api/file/${file.id}/download`} />}
-                        >
+                        <DropdownMenuItem onClick={() => onDownloadFile(file)}>
                           Download
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onShareFile(file)}>

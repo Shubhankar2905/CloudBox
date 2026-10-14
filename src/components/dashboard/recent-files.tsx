@@ -43,6 +43,7 @@ type RecentFilesProps = {
   onShareFile: (file: FileItem) => void;
   onPreviewFile: (file: FileItem) => void;
   onRenameFile: (file: FileItem) => void;
+  onDownloadFile: (file: FileItem) => void;
   onDeleteFile: (file: FileItem) => void;
   onNavigate: (folderId: string) => void;
   onRenameFolder: (folder: FolderItem) => void;
@@ -57,6 +58,7 @@ export function RecentFiles({
   onShareFile,
   onPreviewFile,
   onRenameFile,
+  onDownloadFile,
   onDeleteFile,
   onNavigate,
   onRenameFolder,
@@ -223,9 +225,7 @@ export function RecentFiles({
                     <MoreHorizontal className="size-[18px]" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-36">
-                    <DropdownMenuItem
-                      render={<a href={`/api/file/${file.id}/download`} />}
-                    >
+                    <DropdownMenuItem onClick={() => onDownloadFile(file)}>
                       Download
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onShareFile(file)}>

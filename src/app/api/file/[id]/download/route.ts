@@ -1,5 +1,4 @@
 import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
@@ -38,20 +37,38 @@ export async function GET(
       return NextResponse.json({ message: "File not found" }, { status: 404 });
     }
 
-    const downloadUrl = await getSignedUrl(
-      getS3Client(),
+    const range = req.headers.get("range") || undefined;
+    const result = await getS3Client().send(
       new GetObjectCommand({
         Bucket: getS3Bucket(),
         Key: file.storageKey,
-        ResponseContentType: file.mimeType,
-        ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+        Range: range,
       }),
-      { expiresIn: 300 }
     );
 
-    return NextResponse.redirect(downloadUrl);
+    if (!result.Body) {
+      return NextResponse.json({ message: "File content is unavailable" }, { status: 404 });
+    }
+
+    const headers = new Headers({
+      "Accept-Ranges": "bytes",
+      "Content-Type": file.mimeType || "application/octet-stream",
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+    });
+    if (result.ContentLength !== undefined) {
+      headers.set("Content-Length", String(result.ContentLength));
+    }
+    if (result.ContentRange) headers.set("Content-Range", result.ContentRange);
+
+    return new NextResponse(result.Body.transformToWebStream(), {
+      status: range ? 206 : 200,
+      headers,
+    });
   } catch (error) {
     console.error("Download file error:", error);
+    if ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 416) {
+      return NextResponse.json({ message: "Requested download range is invalid" }, { status: 416 });
+    }
 
     return NextResponse.json(
       { message: "Unable to prepare file download" },

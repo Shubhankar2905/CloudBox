@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { PasswordInput } from "@/components/auth/password-input";
 
 type SignUpErrors = Partial<
-  Record<"name" | "email" | "password" | "confirmPassword", string>
+  Record<"name" | "email" | "password" | "confirmPassword" | "general", string>
 >;
 
 export function SignUpForm() {
@@ -35,8 +35,33 @@ export function SignUpForm() {
     const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-    if (!name || !email || !password) {
+    const nextErrors: SignUpErrors = {};
+
+    if (!name) {
+      nextErrors.name = "Please enter your full name.";
+    }
+
+    if (!email) {
+      nextErrors.email = "Please enter your email address.";
+    }
+
+    if (!password) {
+      nextErrors.password = "Please enter a password.";
+    } else if (password.length < 6) {
+      nextErrors.password = "Password must be at least 6 characters.";
+    }
+
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = "Please confirm your password.";
+    } else if (password !== confirmPassword) {
+      nextErrors.confirmPassword = "Passwords do not match.";
+    }
+
+    setErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
       return;
     }
 
@@ -58,67 +83,63 @@ export function SignUpForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.log(data.error);
+        setErrors({
+          general: data.error || "Unable to create your account.",
+        });
         return;
       }
-
-      console.log("Signup successful:", data);
 
       window.location.href = "/dashboard";
     } catch (error) {
       console.error("Signup failed:", error);
+
+      setErrors({
+        general: "Unable to connect to the server. Please try again.",
+      });
     } finally {
       setIsSubmitting(false);
     }
   }
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0a0d12] px-4 py-10 text-foreground sm:px-6">
-      <Card className="w-full max-w-[440px] border-white/10 bg-[#11161e] shadow-2xl shadow-black/30">
-        <CardHeader className="gap-5 px-6 pb-2 pt-7 sm:px-8 sm:pt-8">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-300/10 text-sky-200">
-              <ShieldCheck className="size-5" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-200/70">
-                CloudBox
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Secure file storage
-              </p>
-            </div>
-          </div>
-          <div>
-            <CardTitle className="text-2xl font-semibold tracking-tight text-white">
+    <main className="flex min-h-svh items-center justify-center bg-background px-4 py-10 text-foreground">
+      <Card className="w-full max-w-md border-border/60 shadow-lg">
+        <CardHeader className="space-y-6 pb-4">
+          <Brand />
+
+          <div className="space-y-2">
+            <CardTitle className="text-2xl font-semibold tracking-tight">
               Create your account
             </CardTitle>
-            <CardDescription className="mt-2 text-sm leading-6 text-slate-400">
+
+            <CardDescription className="leading-relaxed">
               Start storing and sharing your files securely.
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="px-6 pt-5 sm:px-8">
+
+        <CardContent>
           <form className="space-y-4" noValidate onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="sign-up-name" className="text-slate-200">
-                Full Name
-              </Label>
+              <Label htmlFor="sign-up-name">Full name</Label>
+
               <Input
                 id="sign-up-name"
                 name="name"
                 autoComplete="name"
                 placeholder="Alex Morgan"
                 aria-invalid={Boolean(errors.name)}
-                className="h-10 border-white/10 bg-white/[0.04] text-white placeholder:text-slate-500"
+                className="h-10 bg-background"
               />
+
               {errors.name && (
-                <p className="text-xs text-red-300">{errors.name}</p>
+                <p className="text-sm text-destructive">{errors.name}</p>
               )}
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="sign-up-email" className="text-slate-200">
-                Email Address
-              </Label>
+              <Label htmlFor="sign-up-email">Email address</Label>
+
               <Input
                 id="sign-up-email"
                 name="email"
@@ -126,12 +147,14 @@ export function SignUpForm() {
                 autoComplete="email"
                 placeholder="you@example.com"
                 aria-invalid={Boolean(errors.email)}
-                className="h-10 border-white/10 bg-white/[0.04] text-white placeholder:text-slate-500"
+                className="h-10 bg-background"
               />
+
               {errors.email && (
-                <p className="text-xs text-red-300">{errors.email}</p>
+                <p className="text-sm text-destructive">{errors.email}</p>
               )}
             </div>
+
             <PasswordInput
               id="sign-up-password"
               name="password"
@@ -140,18 +163,26 @@ export function SignUpForm() {
               placeholder="At least 6 characters"
               error={errors.password}
             />
+
             <PasswordInput
               id="sign-up-confirm-password"
               name="confirmPassword"
-              label="Confirm Password"
+              label="Confirm password"
               autoComplete="new-password"
               placeholder="Re-enter your password"
               error={errors.confirmPassword}
             />
+
+            {errors.general && (
+              <p role="alert" className="text-sm text-destructive">
+                {errors.general}
+              </p>
+            )}
+
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 h-11 w-full bg-sky-300 font-semibold text-slate-950 hover:bg-sky-200"
+              className="mt-2 h-10 w-full"
             >
               {isSubmitting && (
                 <LoaderCircle
@@ -159,23 +190,41 @@ export function SignUpForm() {
                   aria-hidden="true"
                 />
               )}
-              {isSubmitting ? "Creating account..." : "Create Account"}
+
+              {isSubmitting ? "Creating account..." : "Create account"}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="mt-5 flex-col gap-4 border-white/10 bg-transparent px-6 pb-7 pt-0 sm:px-8 sm:pb-8">
-          <Separator className="bg-white/10" />
-          <p className="text-sm text-slate-400">
+
+        <CardFooter className="flex-col gap-4">
+          <Separator />
+
+          <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link
               href="/sign-in"
-              className="font-medium text-sky-300 hover:text-sky-200 hover:underline"
+              className="font-medium text-primary underline-offset-4 hover:underline"
             >
-              Sign In
+              Sign in
             </Link>
           </p>
         </CardFooter>
       </Card>
     </main>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+        <ShieldCheck className="size-5" aria-hidden="true" />
+      </div>
+
+      <div className="space-y-0.5">
+        <p className="text-sm font-semibold tracking-tight">CloudBox</p>
+        <p className="text-xs text-muted-foreground">Secure file storage</p>
+      </div>
+    </div>
   );
 }
