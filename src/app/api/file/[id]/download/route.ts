@@ -2,7 +2,7 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
 import { getS3Bucket, getS3Client } from "@/lib/s3";
 
 export async function GET(
@@ -10,26 +10,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = req.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
+    const decodeduserId = await getUserId();
+    if(!decodeduserId) {
       return NextResponse.json(
-        { message: "Invalid or expired token" },
+        { message: "Unauthorized" },
         { status: 401 }
       );
     }
-
+    
     const { id } = await params;
     const file = await prisma.file.findFirst({
       where: {
         id,
-        userId: decoded.userId,
+        userId: decodeduserId,
       },
     });
 

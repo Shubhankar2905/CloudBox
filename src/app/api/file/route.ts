@@ -1,33 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
 import type { FileCategory } from "@/lib/file-category";
 
 export async function GET(req: NextRequest) {
   try {
 
-    const token = req.cookies.get("token")?.value;
-
-    if (!token) {
+    const decodeduserId = await getUserId();
+    if(!decodeduserId) {
       return NextResponse.json(
         { message: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token" },
-        { status: 401 }
-      );
-    }
-
-    // return NextResponse.json(
-    //   { message: "Token is valid" },
-    //   { status: 200 }
-    // );
     const searchParams = new URL(req.url).searchParams;
     const folderId = searchParams.get("folderId");
     const requestedCategory = searchParams.get("category") || "all";
@@ -77,7 +63,7 @@ export async function GET(req: NextRequest) {
 
     const files = await prisma.file.findMany({
       where: {
-        userId: decoded.userId,
+        userId: decodeduserId,
         ...(category === "all"
           ? { folderId: folderId || null }
           : category === "others"

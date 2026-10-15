@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getUserId, verifyToken } from "@/lib/auth";
 import {
   createShareToken,
   hashShareToken,
@@ -16,12 +16,17 @@ function unauthorized() {
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
-    const decoded = verifyToken(req.cookies.get("token")?.value || "");
-    if (!decoded) return unauthorized();
+    const decodeduserId = await getUserId();
+    if(!decodeduserId) {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
     const { fileId } = await params;
     const file = await prisma.file.findFirst({
-      where: { id: fileId, userId: decoded.userId },
+      where: { id: fileId, userId: decodeduserId },
       select: { id: true },
     });
 
@@ -61,7 +66,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       data: {
         tokenHash: hashShareToken(token),
         fileId: file.id,
-        createdById: decoded.userId,
+        createdById: decodeduserId,
         allowDownload,
         expiresAt,
       },
@@ -94,12 +99,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
 export async function GET(req: NextRequest, { params }: RouteContext) {
   try {
-    const decoded = verifyToken(req.cookies.get("token")?.value || "");
-    if (!decoded) return unauthorized();
+    const decodeduserId = await getUserId();
+    if(!decodeduserId) {
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
     const { fileId } = await params;
     const file = await prisma.file.findFirst({
-      where: { id: fileId, userId: decoded.userId },
+      where: { id: fileId, userId: decodeduserId },
       select: { id: true },
     });
     if (!file) {
@@ -107,7 +117,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     }
 
     const links = await prisma.sharedLink.findMany({
-      where: { fileId, createdById: decoded.userId },
+      where: { fileId, createdById: decodeduserId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getUserId, verifyToken } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
@@ -8,26 +8,13 @@ export async function GET(
 ) {
   try {
     // Authenticate user
-    const token = req.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid token" },
-        { status: 401 }
-      );
-    }
-
-    const userId = decoded.userId;
-
+       const decodeduserId = await getUserId();
+       if(!decodeduserId) {
+         return NextResponse.json(
+           { message: "Unauthorized" },
+           { status: 401 }
+         );
+       }
     //this one is part of the url params, not the query string. 
     const { id } = await params;
 
@@ -35,7 +22,7 @@ export async function GET(
     const folder = await prisma.folder.findFirst({
       where: {
         id,
-        ownerId: userId,
+        ownerId: decodeduserId,
       },
       include: {
         children: true,
@@ -75,25 +62,13 @@ export async function PATCH(
 ) {
   try {
     // Authenticate user
-    const token = req.cookies.get("token")?.value;
-
-    if (!token) {
+    const decodeduserId = await getUserId();
+    if(!decodeduserId) {
       return NextResponse.json(
         { message: "Unauthorized" },
         { status: 401 }
       );
     }
-
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid token" },
-        { status: 401 }
-      );
-    }
-
-    const userId = decoded.userId;
 
     const { id } = await params;
 
@@ -112,7 +87,7 @@ export async function PATCH(
     const existingFolder = await prisma.folder.findFirst({
       where: {
         id,
-        ownerId: userId,
+        ownerId: decodeduserId,
       },
     });
 
@@ -153,25 +128,15 @@ export async function DELETE(
 ) {
   try {
     // Authenticate user
-    const token = req.cookies.get("token")?.value;
-
-    if (!token) {
+    const decodeduserId = await getUserId();
+    if(!decodeduserId) {
       return NextResponse.json(
         { message: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid token" },
-        { status: 401 }
-      );
-    }
-
-    const userId = decoded.userId;
+    const userId = decodeduserId;
 
     const { id } = await params;
 
