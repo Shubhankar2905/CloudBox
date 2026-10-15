@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { getUserId, verifyToken } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
 import {
   createShareToken,
   hashShareToken,
@@ -10,9 +10,7 @@ import {
 
 type RouteContext = { params: Promise<{ fileId: string }> };
 
-function unauthorized() {
-  return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-}
+
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
